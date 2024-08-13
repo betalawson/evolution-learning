@@ -1,4 +1,4 @@
-function F = fitnessAlleles(s, H)
+function F = fitnessAlleles(s, H, s0)
 %
 %    F = fitnessAlleles(s, h)
 %    F = fitnessAlleles(s, H)
@@ -11,6 +11,11 @@ function F = fitnessAlleles(s, H)
 % specifies the extent to which allele a1 dominates over a2 in the a1a2
 % individual. Necessarily, H(i,j) = 1 - H(j,i). Or if a scalar 'h' is
 % provided, this level of dominance is used for every element.
+
+% Assume a value of s0 = 1 if none given
+if nargin < 3
+    s0 = 1;
+end
 
 % Use the provided selection strength vector to get number of species
 N_spec = length(s);
@@ -29,13 +34,13 @@ end
 A = zeros(N_spec);
 for i = 1:N_spec
     
-    % Diagonal elements: 1 + s_i
-    A(i,i) = 1 + s(i);
+    % Diagonal elements: s0 + s_i
+    A(i,i) = s0 + s(i);
     
-    % Off-diagonal elements: 1 + h(i,j) s(i) + h(j,i) s(j)
+    % Off-diagonal elements: s0 + h(i,j) s(i) + h(j,i) s(j)
     for j = i+1:N_spec
-        A(i,j) = 1 + H(j,i) * s(i) + H(i,j) * s(j);
-        A(j,i) = 1 + H(j,i) * s(i) + H(i,j) * s(j);
+        A(i,j) = s0 + H(j,i) * s(i) + H(i,j) * s(j);
+        A(j,i) = s0 + H(j,i) * s(i) + H(i,j) * s(j);
     end
     
 end
