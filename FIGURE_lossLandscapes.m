@@ -8,13 +8,14 @@ function FIGURE_lossLandscapes(regenerate)
 %%% PARAMETER SETTINGS (ONLY USED IF REGENERATING THE DATA)
 
 % Specify true values of the parameters
-s_true = 0.5;             % Selective advantage
+s_true = 0.2;             % Selective advantage
 h_true = 0.8;             % Dominance in heterozygotes
 x0 = [0.2;0.8];           % Initial proportions
 
 % Specify parameter search ranges (to plot over)
-s_range = [0,2];
-h_range = [-1, 2];
+s_range = [0,1];
+%h_range = [-1, 2];
+h_range = [-0.5, 1.5];
 % Number of points to use in surface plotting (in each dimension)
 Npts = 501;
 
@@ -80,5 +81,34 @@ end
 % Load in the data
 load('DATA_lossSurfaces.mat', 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
 
-% Plot the data
-figure; subplot(1,2,1); surf(sm,hm,f_opt); view(2); shading flat; subplot(1,2,2); surf(sm,hm,df_opt); view(2); shading flat;
+% Prepare the figure
+figure('units','Normalized','OuterPosition',[0 0 1 1]);
+tiles_obj = tiledlayout(1,2);
+
+% Left panel - standard regression
+nexttile;
+hold on;
+surf(sm,hm,f_opt);
+plot3(s_true,h_true,max(f_opt(:))+1,'pentagram','MarkerSize',25,'MarkerEdgeColor',[1.0, 0.2, 0.2],'MarkerFaceColor',[1.0, 0.2, 0.2]);
+shading flat;
+view(2);
+xlabel('Selection Advantage, s');
+ylabel('Dominance, h');
+set(gca,'FontSize',20);
+title('Standard Regression','FontSize',24);
+
+% Right panel - gradient regression
+nexttile;
+hold on;
+surf(sm,hm,df_opt);
+plot3(s_true,h_true,max(df_opt(:))+1,'pentagram','MarkerSize',25,'MarkerEdgeColor',[1.0, 0.2, 0.2],'MarkerFaceColor',[1.0, 0.2, 0.2]);
+shading flat;
+view(2);
+xlabel('Selection Advantage, s');
+ylabel('Dominance, h');
+set(gca,'FontSize',20);
+title('Gradient Matching Regression','FontSize',24);
+
+% Tighten up the layout
+tiles_obj.TileSpacing = 'compact';
+tiles_obj.Padding = 'compact';
