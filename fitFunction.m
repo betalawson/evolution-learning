@@ -72,7 +72,7 @@ end
 
 % Plot the predictions if requested
 if options.visualise_fit
-   
+       
     % Prepare figure
     figure('units','normalized','OuterPosition',[0 0 1 1]);
     hold on;

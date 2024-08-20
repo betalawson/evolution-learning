@@ -9,7 +9,7 @@ function createTestProblems()
 % Number of features
 N_feat = 2;
 % Initial condition
-X0 = [0.5; 0.5];
+X0 = [0.2; 0.8];
 % Population size
 N_pop = 2000;
 % Number of generations

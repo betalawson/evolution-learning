@@ -1,4 +1,4 @@
-function FIGURE_lossLandscapes(regenerate)
+function FIGURE2_lossLandscapes(regenerate)
 % This function plots the loss surface to be optimised in fitting the
 % parameters of a basic bi-allelic inheritance problem to synthetic data.
 % This is compared with the corresponding loss surface for gradient
@@ -78,36 +78,49 @@ end
 
 %%% PLOTTING
 
+% Specify the number of slots (controls spacing of figure panels)
+N_slots = 11;
+
 % Load in the data
 load('DATA_lossSurfaces.mat', 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
 
+% Load colormaps
+load('extra_colormaps.mat','viridis');
+
 % Prepare the figure
 figure('units','Normalized','OuterPosition',[0 0 1 1]);
-tiles_obj = tiledlayout(1,2);
+tiles_obj = tiledlayout(1,2*N_slots+1);
 
 % Left panel - standard regression
-nexttile;
+nexttile([1 N_slots]);
+hold on;
 hold on;
 surf(sm,hm,f_opt);
+colormap(viridis);
 plot3(s_true,h_true,max(f_opt(:))+1,'pentagram','MarkerSize',25,'MarkerEdgeColor',[1.0, 0.2, 0.2],'MarkerFaceColor',[1.0, 0.2, 0.2]);
 shading flat;
 view(2);
 xlabel('Selection Advantage, s');
 ylabel('Dominance, h');
-set(gca,'FontSize',20);
-title('Standard Regression','FontSize',24);
+set(gca,'FontSize',24);
+title('Standard Regression','FontSize',28);
+
+% "Middle" panel - gap
+nexttile([1 1]);
+set(gca,'Visible',false);
 
 % Right panel - gradient regression
-nexttile;
+nexttile([1 N_slots]);
 hold on;
 surf(sm,hm,df_opt);
+colormap(viridis);
 plot3(s_true,h_true,max(df_opt(:))+1,'pentagram','MarkerSize',25,'MarkerEdgeColor',[1.0, 0.2, 0.2],'MarkerFaceColor',[1.0, 0.2, 0.2]);
 shading flat;
 view(2);
 xlabel('Selection Advantage, s');
 ylabel('Dominance, h');
-set(gca,'FontSize',20);
-title('Gradient Matching Regression','FontSize',24);
+set(gca,'FontSize',24);
+title('Gradient Matching Regression','FontSize',28);
 
 % Tighten up the layout
 tiles_obj.TileSpacing = 'compact';

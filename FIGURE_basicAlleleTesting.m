@@ -3,15 +3,15 @@ function FIGURE_basicAlleleTesting(regenerate)
 % equation learning performs for identifying selection strength and
 % dominance for a bi-allelic inheritance scenario
 
-% Specify a random seed for consistency
-rng(7);
-
 % Specify how many replicates to use in generating stochastic data to fit
 % to, for box plotting
-N_rep = 1000;
+N_rep = 5;
 
 % Specify the population sizes to run using
 pop_sizes = 10.^(2:5);
+
+% Specify which types of selection to test (1 or 2 or both)
+test_types = [1,2];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -21,8 +21,8 @@ pop_sizes = 10.^(2:5);
 if nargin < 1
     regenerate = false;
 elseif regenerate
-    userYN = input("All data will be regenerated. Please confirm Y/N: ");
-    if ~STRCMP(userYN,'y')
+    userYN = input("All data will be regenerated. Please confirm Y/N: ",'s');
+    if strcmpi(userYN,'y')
         regenerate = true;
     else
         regenerate = false;
@@ -47,8 +47,8 @@ filename = 'DATA_Npop_orders01';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
     ELoptions.symmetric_payoff = false;
-    ELoptions.orders = [0,1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+    ELoptions.library_orders = [0,1];
+    simResults = runNpopSims(problems, N_rep, pop_sizes, test_types, ELoptions, filename);
 else
     load([filename,'.mat'],'simResults');
 end    
@@ -60,8 +60,8 @@ filename = 'DATA_Npop_orders1';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
     ELoptions.symmetric_payoff = false;
-    ELoptions.orders = [1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+    ELoptions.library_orders = [1];
+    simResults = runNpopSims(problems, N_rep, pop_sizes, test_types, ELoptions, filename);
 else
     load([filename,'.mat'],'simResults');
 end    
@@ -73,8 +73,8 @@ filename = 'DATA_Npop_orders012';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
     ELoptions.symmetric_payoff = false;
-    ELoptions.orders = [0,1,2];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+    ELoptions.library_orders = [0,1,2];
+    simResults = runNpopSims(problems, N_rep, pop_sizes, test_types, ELoptions, filename);
 else
     load([filename,'.mat'],'simResults');
 end    
@@ -86,8 +86,8 @@ filename = 'DATA_Npop_symm';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
     ELoptions.symmetric_payoff = true;
-    ELoptions.orders = [1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+    ELoptions.library_orders = [1];
+    simResults = runNpopSims(problems, N_rep, pop_sizes, test_types, ELoptions, filename);
 else
     load([filename,'.mat'],'simResults');
 end    
@@ -96,13 +96,17 @@ plotOverPopSizes(simResults, title_txt);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-function simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename)
+function simResults = runNpopSims(problems, N_rep, pop_sizes, test_types, ELoptions, filename)
 %
 % This subfunction generates data for equation learning applied to the
 % provided allele inheritance problems, returning the estimated values for
 % the parameters (s,h) for different population sizes
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Specify a random seed for consistency - this should give the same
+% trajectories for each different approach to match, also
+rng(7);
 
 % Loop over the list of population sizes, learning parameters s and h for
 % each
@@ -112,33 +116,51 @@ h_mat = zeros(N_pops, 2, N_rep);
 for k = 1:N_pops
    
     % Loop over the two types of selection and generate results for each
-    for type = [1,2]
+    for type = test_types
     
         % Overwrite the population size for this problem
         problem = problems{type};
         problem.N_pop = pop_sizes(k);
     
         % Repeatedly generate new Wright-Fisher data and learn s and h
-        parfor r = 1:N_rep
+        for r = 1:N_rep
         
             % Generate the Wright-Fisher data
             traj = generateTrajectories(problem);
         
             % Convert to non-dimensionalised time for equation learning
             WF_nonD = struct('t',traj.WF.t / problem.t_gen, 'X', traj.WF.X);
-        
+
             % Perform equation learning
             [fitfun, Flib, K, texts] = evolutionLearning(WF_nonD, type, ELoptions);
-        
-            % Extract learned payoff matrix and normalise using a_22 = 1
-            payoff = fitnessToPayoff(K,texts,2);
+            
+            % Extract payoff matrix and normalise using invariant operations
+            payoff = fitnessToPayoff(K,texts,2);            
             if type == 1
                 payoff = payoff - payoff(2,2) + 1;
                 payoff(:,1) = payoff(:,1) - payoff(2,1) + payoff(1,2);
             else
                 payoff = payoff / payoff(2,2);
             end
-
+            
+            if type == 2
+                figure; hold on;
+                learned_problem = problem;
+                learned_problem.fitness = @(X) payoff*X;
+                learned_traj = generateTrajectories(learned_problem);
+                plot(traj.WF.t,traj.WF.X(1,:),'k.','MarkerSize',30);
+                plot(learned_traj.rep.t,learned_traj.rep.X(1,:),'r','LineWidth',2);
+                plot(traj.rep.t,traj.rep.X(1,:),'b','LineWidth',2);
+                ICproblem = problem;
+                ICproblem.X0 = [0.8;0.2];
+                ICtraj = generateTrajectories(ICproblem);
+                IClearned_problem = learned_problem;
+                IClearned_problem.X0 = [0.8;0.2];
+                IClearned_traj = generateTrajectories(IClearned_problem);
+                plot(IClearned_traj.rep.t,IClearned_traj.rep.X(1,:),'r--','LineWidth',2);
+                plot(ICtraj.rep.t,ICtraj.rep.X(1,:),'b--','LineWidth',2);
+            end
+                                    
             % Extract the values of s and h and store them 
             s_mat(k,type,r) = payoff(1,1) - 1;
             h_mat(k,type,r) = (0.5 * ( payoff(1,2) + payoff(2,1) ) - 1) / s_mat(k,type,r);
@@ -152,7 +174,7 @@ end
 % using it for reference
 s_perfect = zeros(1,2);
 h_perfect = zeros(1,2);
-for type = [1,2]
+for type = test_types
     
     % Load in problem
     problem = problems{type};
@@ -165,10 +187,11 @@ for type = [1,2]
         Xdash_true(:,j) = replicatorRHS(X_true(:,j),problem.fitness,type);
     end
     
+    % Provide the perfect data and use it for evolution learning
     ELoptions.Xdash_data = Xdash_true;
     [fitfun, Flib, K, texts] = evolutionLearning(traj.rep, type, ELoptions);
     
-    % Extract learned payoff matrix and normalise using a_22 = 1
+    % Extract payoff matrix and normalise using invariant operations
     payoff = fitnessToPayoff(K,texts,2);
     if type == 1
         payoff = payoff - payoff(2,2) + 1;
@@ -176,7 +199,6 @@ for type = [1,2]
     else
         payoff = payoff / payoff(2,2);
     end
-
     % Extract the values of s and h and store them 
     s_perfect(type) = payoff(1,1) - 1;
     h_perfect(type) = (0.5 * ( payoff(1,2) + payoff(2,1) ) - 1) / s_perfect(type);
@@ -235,7 +257,7 @@ N_pops = length(pop_sizes);
 % Prepare the labels for each population size
 x_txts = cell(1,N_pops);
 for k = 1:N_pops
-    x_txts{k} = ['N = ',num2str(pop_sizes(k))];
+    x_txts{k} = ['N = 10^{',num2str(log10(pop_sizes(k))),'}'];
 end
 x_txts{N_pops+1} = 'Perfect Data';
 
