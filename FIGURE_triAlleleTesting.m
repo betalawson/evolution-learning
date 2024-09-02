@@ -5,7 +5,7 @@ function FIGURE_triAlleleTesting(regenerate)
 
 % Specify how many replicates to use in generating stochastic data to fit
 % to, for box plotting
-N_rep = 250;
+N_rep = 500;
 
 % Specify the population sizes to run using
 pop_sizes = 10.^(2:5);
@@ -32,64 +32,35 @@ end
 % Settings for these will be adjusted as needed
 load('problems_inheritance.mat', 'allele_standard1', 'allele_transient1', 'allele_persistent1', 'allele_standard2', 'allele_transient2', 'allele_persistent2');
 
-% Store type I and type II in a single cell array
-problems = {allele_standard1, allele_transient1, allele_persistent1, allele_standard2, allele_transient2, allele_persistent2};
+% Create a cell array of cell arrays that contains the type I and type II
+% versions of each problem to be looped over
+problems_list = { {allele_standard1, allele_standard2}, {allele_transient1, allele_transient2}, {allele_persistent1, allele_persistent2} };
 
+% Specify the filename "suffixes" for each problem in the master list
+problem_filenames = {'std', 'tran', 'pers'};
+problem_names = {'Standard', 'Transient', 'Persistent'};
 
-%%% RUNNING PROBLEMS UNDER DIFFERENT SETTINGS
+% Loop over and run each problem from the problem list separately
+for P = 1:length(problems_list)
+    
+    % Load in current problems (type I and type II) from master list
+    problems = problems_list{P};
+        
+    %%% PASTE OTHER METHODS HERE IF THEY ARE ALSO TO BE RUN
+    
+    % Using method: Symmetric payoff matrix
+    filename = ['DATA_IN',problem_filenames{P},'_Npop_symm'];
+    % Regenerate if requested or data not present
+    if ~exist([filename,'.mat'],'file') || regenerate
+        ELoptions.symmetric_payoff = true;
+        ELoptions.library_orders = [1];
+        simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+    else
+        load([filename,'.mat'],'simResults');
+    end    
+    plotOverPopSizes(simResults, problem_names{P});
 
-% General linear equation learning
-title_txt = 'Up to First Order';
-filename = 'DATA_IN_Npop_orders01';
-% Regenerate if requested or data not present
-if ~exist([filename,'.mat'],'file') || regenerate
-    ELoptions.symmetric_payoff = false;
-    ELoptions.library_orders = [0,1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
-else
-    load([filename,'.mat'],'simResults');
-end    
-plotOverPopSizes(simResults, title_txt);
-
-% Strictly payoff matrix elements
-title_txt = 'Strictly First Order';
-filename = 'DATA_IN_Npop_orders1';
-% Regenerate if requested or data not present
-if ~exist([filename,'.mat'],'file') || regenerate
-    ELoptions.symmetric_payoff = false;
-    ELoptions.library_orders = [1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
-else
-    load([filename,'.mat'],'simResults');
-end    
-plotOverPopSizes(simResults, title_txt);
-
-% Quadratic fitness function
-title_txt = 'Up to Second Order';
-filename = 'DATA_IN_Npop_orders012';
-% Regenerate if requested or data not present
-if ~exist([filename,'.mat'],'file') || regenerate
-    ELoptions.symmetric_payoff = false;
-    ELoptions.library_orders = [0,1,2];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
-else
-    load([filename,'.mat'],'simResults');
-end    
-plotOverPopSizes(simResults, title_txt);
-
-% Specifically a symmetric payoff matrix
-title_txt = 'Symmetric Payoff';
-filename = 'DATA_IN_Npop_symm';
-% Regenerate if requested or data not present
-if ~exist([filename,'.mat'],'file') || regenerate
-    ELoptions.symmetric_payoff = true;
-    ELoptions.library_orders = [1];
-    simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
-else
-    load([filename,'.mat'],'simResults');
-end    
-plotOverPopSizes(simResults, title_txt);
-
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -106,14 +77,15 @@ function simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filenam
 % trajectories for each different approach to match, also
 rng(7);
 
-% Loop over the list of population sizes, learning parameters s and h for
-% each
+% Loop over the list of population sizes, learning parameters for each
 N_pops = length(pop_sizes);
 s1_mat = zeros(N_pops, 2, N_rep);
 s2_mat = zeros(N_pops, 2, N_rep);
 h12_mat = zeros(N_pops, 2, N_rep);
 h13_mat = zeros(N_pops, 2, N_rep);
 h23_mat = zeros(N_pops, 2, N_rep);
+l2_mat = zeros(N_pops, 2, N_rep);
+
 for k = 1:N_pops
    
     % Loop over the two types of selection and generate results for each
@@ -124,7 +96,7 @@ for k = 1:N_pops
         problem.N_pop = pop_sizes(k);
     
         % Repeatedly generate new Wright-Fisher data and learn s and h
-        parfor r = 1:N_rep
+        for r = 1:N_rep
         
             % Generate the Wright-Fisher data
             traj = generateTrajectories(problem);
@@ -132,6 +104,19 @@ for k = 1:N_pops
             % Convert to non-dimensionalised time for equation learning
             WF_nonD = struct('t',traj.WF.t / problem.t_gen, 'X', traj.WF.X);
         
+            % Build additional trajectories for alternate initial
+            % conditions as extra data
+%              IClist = [ [0.1;0.4;0.5], [0.2; 0.7; 0.1], [0.4; 0.3; 0.3], [0.4; 0.5; 0.1], [0.4; 0.1; 0.5], [0.6; 0.3; 0.1], [0.6; 0.1; 0.3], [0.1; 0.8; 0.1], [0.1; 0.6; 0.3], [0.1; 0.3; 0.6] ];
+%              traj_data = cell(1,size(IClist,2)+1);
+%              traj_data{1} = WF_nonD;
+%              for kk = 1:size(IClist,2)
+%                  ICproblem = problem;
+%                  ICproblem.X0 = IClist(:,kk);
+%                  ICtraj = generateTrajectories(ICproblem);
+%                  ICWF_nonD = struct('t',ICtraj.WF.t / problem.t_gen, 'X', ICtraj.WF.X);
+%                  traj_data{kk+1} = ICWF_nonD;
+%              end
+            
             % Perform equation learning
             [fitfun, Flib, K, texts] = evolutionLearning(WF_nonD, type, ELoptions);
         
@@ -192,6 +177,13 @@ for k = 1:N_pops
             h12_mat(k,type,r) = h12;
             h13_mat(k,type,r) = h13;
             h23_mat(k,type,r) = h23;
+            
+            % Simulate the learned dynamics and evaluate the L2 error
+            % between the learned dynamics and the actual replicator
+            learned_problem = problem;
+            learned_problem.fitness = @(X) payoff*X;
+            learned_traj = generateTrajectories(learned_problem, 'rep');
+            l2_mat(k,type,r) = rms(traj.rep.X(:) - learned_traj.rep.X(:));      
 
         end 
     end    
@@ -205,6 +197,7 @@ s2_perfect = zeros(1,2);
 h12_perfect = zeros(1,2);
 h13_perfect = zeros(1,2);
 h23_perfect = zeros(1,2);
+l2_perfect = zeros(1,2);
 
 for type = [1,2]
     
@@ -277,6 +270,12 @@ for type = [1,2]
     h12_perfect(type) = h12;
     h13_perfect(type) = h13;
     h23_perfect(type) = h23;
+    
+    % Find the L2 error to the true selective trajectory
+    learned_problem = problem;
+    learned_problem.fitness = @(X) payoff*X;
+    learned_traj = generateTrajectories(learned_problem);
+    l2_perfect(type) = rms(traj.rep.X(:) - learned_traj.rep.X(:));
 
 end
 
@@ -339,7 +338,7 @@ h13_true = h13;
 h23_true = h23;
 
 % Store all data in a single results object and save it
-simResults = struct('s1_mat',s1_mat,'s2_mat',s2_mat,'h12_mat',h12_mat,'h13_mat',h13_mat,'h23_mat',h23_mat,'s1_perfect',s1_perfect,'s2_perfect',s2_perfect,'h12_perfect',h12_perfect,'h13_perfect',h13_perfect,'h23_perfect',h23_perfect,'s1_true',s1_true,'s2_true',s2_true,'h12_true',h12_true,'h13_true',h13_true,'h23_true',h23_true,'pop_sizes',pop_sizes);
+simResults = struct('s1_mat',s1_mat,'s2_mat',s2_mat,'h12_mat',h12_mat,'h13_mat',h13_mat,'h23_mat',h23_mat,'l2_mat',l2_mat,'s1_perfect',s1_perfect,'s2_perfect',s2_perfect,'h12_perfect',h12_perfect,'h13_perfect',h13_perfect,'h23_perfect',h23_perfect,'l2_perfect',l2_perfect,'s1_true',s1_true,'s2_true',s2_true,'h12_true',h12_true,'h13_true',h13_true,'h23_true',h23_true,'pop_sizes',pop_sizes);
 save([filename,'.mat'],'simResults');
 
 
@@ -370,11 +369,13 @@ s2_mat = simResults.s2_mat;
 h12_mat = simResults.h12_mat;
 h13_mat = simResults.h13_mat;
 h23_mat = simResults.h23_mat;
+l2_mat = log(simResults.l2_mat);
 s1_perfect = simResults.s1_perfect;
 s2_perfect = simResults.s2_perfect;
 h12_perfect = simResults.h12_perfect;
 h13_perfect = simResults.h13_perfect;
 h23_perfect = simResults.h23_perfect;
+l2_perfect = log(simResults.l2_perfect);
 s1_true = simResults.s1_true;
 s2_true = simResults.s2_true;
 h12_true = simResults.h12_true;
@@ -418,7 +419,7 @@ for pnum = 1:length(p_mats)
     boxplot_obj = boxplot2(p_mat);
     % Add colours to the plot
     for ii = 1:2
-        structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:)), boxplot_obj);
+        structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
     end
     % Add to the plot the parameter learned for perfect data
     hold on;
@@ -430,6 +431,74 @@ for pnum = 1:length(p_mats)
     xticklabels(x_txts);
     set(gca,'FontSize',20);
     ylabel(p_names{pnum},'Fontsize',24);
-    title(['Estimation of ',p_descs{pnum},' --- ',title_txt],'FontSize',20);
+    title(['EstiMATion of ',p_descs{pnum},' --- ',title_txt],'FontSize',20);
 
 end
+
+
+%%% SEPARATE FIGURE FOR THE ERROR BETWEEN LEARNED DYNAMICS AND REPLICATOR
+
+% Prepare the figure
+figure; hold on;
+% Plot the boxplot showing main data
+boxplot_obj = boxplot2(l2_mat);
+% Add colours to the plot
+for ii = 1:2
+    structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
+end
+hold on;
+plot(N_pops+0.9,l2_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
+plot(N_pops+1.1,l2_perfect(2),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(2,:));
+% Clean up plot
+axis([0 N_pops+1.2  -0.1+min([l2_mat(:);l2_perfect(:)]) 0.1+max([l2_mat(:); l2_perfect(:)]) ]);
+xticks(1:N_pops+1);
+xticklabels(x_txts);
+set(gca,'FontSize',20);
+ylabel('Root Mean Square Error','Fontsize',24);
+title(['L_2 error to True Selection Trajectory --- ',title_txt],'FontSize',20);
+
+
+% THE BELOW MAY BE COPY-PASTED INTO THE SECTION SPECIFIED ABOVE (WITH MINOR
+% MODIFICATIONS OF TITLE TEXT ON FIGURES ETC) TO TEST OTHER METHODS THAT
+% DON'T GUARANTEE A SYMMETRIC PAYOFF MATRIX
+
+% %%% RUNNING PROBLEMS UNDER DIFFERENT SETTINGS
+% 
+% % General linear equation learning
+% title_txt = 'Up to First Order';
+% filename = ['DATA_IN',problem_filenames{P},'_Npop_orders01'];
+% % Regenerate if requested or data not present
+% if ~exist([filename,'.mat'],'file') || regenerate
+%     ELoptions.symmetric_payoff = false;
+%     ELoptions.library_orders = [0,1];
+%     simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+% else
+%     load([filename,'.mat'],'simResults');
+% end    
+% plotOverPopSizes(simResults, title_txt);
+% 
+% % Strictly payoff matrix elements
+% title_txt = 'Strictly First Order';
+% filename = ['DATA_IN',problem_filenames{P},'_Npop_orders1'];
+% % Regenerate if requested or data not present
+% if ~exist([filename,'.mat'],'file') || regenerate
+%     ELoptions.symmetric_payoff = false;
+%     ELoptions.library_orders = [1];
+%     simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+% else
+%     load([filename,'.mat'],'simResults');
+% end    
+% plotOverPopSizes(simResults, title_txt);
+% 
+% % Quadratic fitness function
+% title_txt = 'Up to Second Order';
+% filename = ['DATA_IN',problem_filenames{P},'_Npop_orders012'];
+% % Regenerate if requested or data not present
+% if ~exist([filename,'.mat'],'file') || regenerate
+%     ELoptions.symmetric_payoff = false;
+%     ELoptions.library_orders = [0,1,2];
+%     simResults = runNpopSims(problems, N_rep, pop_sizes, ELoptions, filename);
+% else
+%     load([filename,'.mat'],'simResults');
+% end    
+% plotOverPopSizes(simResults, title_txt);

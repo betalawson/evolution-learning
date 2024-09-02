@@ -31,11 +31,12 @@ if options.force_positive
     
     % Create fitting function with square transform to force positive and
     % appended "cost" of large values for coefficients
-    fitfun = @(K,X) [ modelfun(X,F,K.^2); sqrt(options.shrinkage)*(K.^2) ];
+    fitfun = @(sqrtK,X) [ modelfun(X,F,sqrtK.^2); sqrt(options.shrinkage)*norm(sqrtK.^2 - 1/sqrt(length(F))) ];
+
     % Append a value of zero as "data" to punish this cost
-    Yfit = [X_dash_data(:); zeros(length(F),1)];
+    Yfit = [X_dash_data(:); 0];
     % Fit the model    
-    sqrtK = nlinfit(X_data',Yfit,fitfun,rand(length(F),1));
+    sqrtK = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
     K = sqrtK.^2;
     
 % Otherwise, optimise using standard nonlinear fitting
@@ -43,12 +44,12 @@ else
     
     % Create fitting function with exponential transform to force positive
     % and appended "cost" of large values for coefficients
-    fitfun = @(K,X) [ modelfun(X,F,K); sqrt(options.shrinkage)*K ];
+    fitfun = @(K,X) [ modelfun(X,F,K); sqrt(options.shrinkage)*norm(K - 1/sqrt(length(F))) ];
+
     % Append a value of zero as "data" to punish this cost
-    Yfit = [X_dash_data(:); zeros(length(F),1)];
+    Yfit = [X_dash_data(:); 0];
     % Fit the model
-    fitfun(ones(length(F),1),X_data')
-    K = nlinfit(X_data',Yfit,fitfun,rand(length(F),1));
+    K = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
     
 end
 

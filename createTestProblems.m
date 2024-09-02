@@ -22,7 +22,7 @@ obs_Nth = 10;
 % Allele selection strength and dominance
 s = 0.2;
 h = 0.8;
-fitness = fitnessAlleles([s;0],[0,0;h,0]);
+fitness = fitnessAlleles([s;0],[0,0;h,0], 1);
 
 % Create problem objects
 allele_basic1 = struct('N_feat',N_feat,'X0',X0,'N_pop',N_pop,'N_gen',N_gen,'t_gen',t_gen,'obs_Nth',obs_Nth,'fitness',fitness,'selection_type',1);
