@@ -357,14 +357,21 @@ function plotOverPopSizes(simResults, title_txt)
 type_clrs = [ [ 1.0, 0.4, 0.4 ];
               [ 0.4, 0.4, 1.0 ]  ];
           
+% Specify the fraction of data to keep
+keep_frac = 0.95;
+
 % Specify the minimum and maximum allowable values for s and h on the plots
-ymin = -0.75;
-ymax = 1.75;
+% These are used where the range of 'keep_frac' proportion of the data
+% becomes too large
+y_absmin = -0.75;
+y_absmax = 1.75;
           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%% FIX OTHERS TO ALSO TRIM
+
 % Extract results
-s1_mat = simResults.s1_mat;
+s1_mat = trimToCI(simResults.s1_mat,keep_frac);
 s2_mat = simResults.s2_mat;
 h12_mat = simResults.h12_mat;
 h13_mat = simResults.h13_mat;
@@ -389,6 +396,7 @@ p_trues = {s1_true, s2_true, h12_true, h13_true, h23_true};
 p_perfects = {s1_perfect, s2_perfect, h12_perfect, h13_perfect, h23_perfect};
 
 % Specify the parameter names (letters and descriptions)
+%%% (DESCRIPTIONS CURRNETLY UNUSED, TOO LONG FOR PLOTS )
 p_names = {'s_1', 's_2', 'h_{12}', 'h_{13}', 'h_{23}'};
 p_descs = {'Selective Advantage of Allele 1', 'Selective Advantage of Allele 2', 'Dominance of Allele 1 over 2', 'Dominance of Allele 1 over 3', 'Dominance of Allele 2 over 3'}; 
 
@@ -398,9 +406,9 @@ N_pops = length(pop_sizes);
 % Prepare the labels for each population size
 x_txts = cell(1,N_pops);
 for k = 1:N_pops
-    x_txts{k} = ['N = ',num2str(pop_sizes(k))];
+    x_txts{k} = ['10^{',num2str(log10(simResults.pop_sizes(k))),'}'];
 end
-x_txts{N_pops+1} = 'Perfect Data';
+x_txts{N_pops+1} = '\infty';
 
 
 % Loop over each bit of data in the cell arrays
@@ -425,13 +433,20 @@ for pnum = 1:length(p_mats)
     hold on;
     plot(N_pops+0.9,p_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
     plot(N_pops+1.1,p_perfect(2),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(2,:));
+    
+    % Determine appropriate y-axis limits for this parameter
+    pmin = min(p_mat(:));
+    pmax = max(p_mat(:));
+    ymin = max([y_absmin; pmin-0.1*(pmax-pmin)]);
+    ymax = min([y_absmax; pmax+0.1*(pmax-pmin)]);
     % Clean up plot
-    axis([0 N_pops+1.2 ymin ymax]);
+    axis([0.5 N_pops+0.5 ymin ymax]);
     xticks(1:N_pops+1);
     xticklabels(x_txts);
-    set(gca,'FontSize',20);
-    ylabel(p_names{pnum},'Fontsize',24);
-    title(['EstiMATion of ',p_descs{pnum},' --- ',title_txt],'FontSize',20);
+    set(gca,'FontSize',20,'LineWidth',2);
+    xlabel('$N$','FontSize',24,'Interpreter','latex');
+    ylabel(p_names{pnum},'Fontsize',24,'Interpreter','latex');   
+    title(['Estimated ',p_names{pnum},' (',title_txt,')'],'FontSize',20,'Interpreter','latex');
 
 end
 
@@ -453,9 +468,10 @@ plot(N_pops+1.1,l2_perfect(2),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(2
 axis([0 N_pops+1.2  -0.1+min([l2_mat(:);l2_perfect(:)]) 0.1+max([l2_mat(:); l2_perfect(:)]) ]);
 xticks(1:N_pops+1);
 xticklabels(x_txts);
-set(gca,'FontSize',20);
-ylabel('Root Mean Square Error','Fontsize',24);
-title(['L_2 error to True Selection Trajectory --- ',title_txt],'FontSize',20);
+set(gca,'FontSize',20,'LineWidth',2);
+xlabel('$N$','FontSize',24,'Interpreter','latex')
+ylabel('$L_2$','Fontsize',24,'Interpreter','latex');
+title(['Trajectory $L_2$ Error (',title_txt,')'],'FontSize',20,'Interpreter','latex');
 
 
 % THE BELOW MAY BE COPY-PASTED INTO THE SECTION SPECIFIED ABOVE (WITH MINOR

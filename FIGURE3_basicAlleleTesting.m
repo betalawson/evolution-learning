@@ -42,7 +42,7 @@ problems = {allele_basic1, allele_basic2};
 %%% EFFECTS OF POPULATION SIZE (ACROSS METHODS)
 
 % General linear equation learning
-title_txt = 'Up to First Order';
+title_txt = '$p \leq 1$';
 filename = 'DATA_Npop_orders01';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
@@ -57,15 +57,15 @@ end
 N_pops = length(simResults.pop_sizes);
 x_txts = cell(1,N_pops);
 for k = 1:N_pops
-    x_txts{k} = ['N = 10^{',num2str(log10(simResults.pop_sizes(k))),'}'];
+    x_txts{k} = ['10^{',num2str(log10(simResults.pop_sizes(k))),'}'];
 end
-x_txts{N_pops+1} = 'Perfect Data';
+x_txts{N_pops+1} = '\infty';
 
 % Actually plot
-plotBoxPlot(simResults, x_txts, title_txt);
+plotBoxPlot(simResults, x_txts, title_txt, true);
 
 % Strictly payoff matrix elements
-title_txt = 'Strictly First Order';
+title_txt = '$p = 1$';
 filename = 'DATA_Npop_orders1';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
@@ -75,10 +75,10 @@ if ~exist([filename,'.mat'],'file') || regenerate
 else
     load([filename,'.mat'],'simResults');
 end    
-plotBoxPlot(simResults, x_txts, title_txt);
+plotBoxPlot(simResults, x_txts, title_txt, true);
 
 % Quadratic fitness function
-title_txt = 'Up to Second Order';
+title_txt = '$p \leq 2$';
 filename = 'DATA_Npop_orders012';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
@@ -88,10 +88,10 @@ if ~exist([filename,'.mat'],'file') || regenerate
 else
     load([filename,'.mat'],'simResults');
 end    
-plotBoxPlot(simResults, x_txts, title_txt);
+plotBoxPlot(simResults, x_txts, title_txt, true);
 
 % Specifically a symmetric payoff matrix
-title_txt = 'Symmetric Payoff';
+title_txt = 'Symm.';
 filename = 'DATA_Npop_symm';
 % Regenerate if requested or data not present
 if ~exist([filename,'.mat'],'file') || regenerate
@@ -101,7 +101,7 @@ if ~exist([filename,'.mat'],'file') || regenerate
 else
     load([filename,'.mat'],'simResults');
 end    
-plotBoxPlot(simResults, x_txts, title_txt);
+plotBoxPlot(simResults, x_txts, title_txt, true);
 
 
 %%% EFFECTS OF METHOD CHOICE (FOR A SINGLE POPULATION SIZE)
@@ -113,7 +113,7 @@ pop_level = 2;
 filenames = {'DATA_Npop_orders1', 'DATA_Npop_orders01', 'DATA_Npop_orders012', 'DATA_Npop_symm'};
 
 % Define the methods text used on the figure
-method_txts = {'1st Order', '0th-1st Order', '0th-2nd order', 'Symmetric'};
+method_txts = {'p = 1', 'p \leq 1', 'p \leq 2', 'Symm.'};
 
 % Load in the first dataset to set up the structure
 load([filenames{1},'.mat'],'simResults');
@@ -133,7 +133,7 @@ for m = 2:length(filenames)
 end
 
 % Plot these results
-plotBoxPlot(struct('s_mat',s_mat,'h_mat',h_mat,'l2_mat',l2_mat,'s_true',simResults.s_true,'h_true',simResults.h_true), method_txts, ['N = ',num2str(simResults.pop_sizes(pop_level))], false);
+plotBoxPlot(struct('s_mat',s_mat,'h_mat',h_mat,'l2_mat',l2_mat,'s_true',simResults.s_true,'h_true',simResults.h_true), method_txts, ['$N = ',num2str(simResults.pop_sizes(pop_level)),'$']);
 
 
 
@@ -264,12 +264,16 @@ save([filename,'.mat'],'simResults');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-function plotBoxPlot(simResults, x_txts, title_txt, plot_perfect)
+function plotBoxPlot(simResults, x_txts, title_txt, plot_pop)
 %
-% This subfunction just loops over the provided population sizes and
-% calculates the equation-learned values of the allele inheritance
-% parameters across the specified number of replicate realisations of
-% Wright-Fisher
+% This subfunction plots the results of equation learning on a boxplot,
+% showing the results across repeated replicates as contained in the
+% provided structure, 'simResults'. 'x_txts' and 'title_txt' define the
+% text to use on x-axis ticks, and additional title text, respectively.
+%
+% If the optional argument 'plot_pop' is provided as true, then the x-axis
+% is given a label 'N', and the results for perfect data are also shown
+% (provide the label for this in 'x_txts')
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -277,15 +281,20 @@ function plotBoxPlot(simResults, x_txts, title_txt, plot_perfect)
 type_clrs = [ [ 1.0, 0.4, 0.4 ];
               [ 0.4, 0.4, 1.0 ]  ];
           
+% Specify the fraction of data to keep
+keep_frac = 0.95;
+
 % Specify the minimum and maximum allowable values for s and h on the plots
-pmin = -0.75;
-pmax = 1.75;
+% These are used where the range of 'keep_frac' proportion of the data
+% becomes too large
+y_absmin = -0.75;
+y_absmax = 1.75;
           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Assume perfect value will be plotted
 if nargin < 4
-    plot_perfect = true;
+    plot_pop = false;
 end
 
 % Extract results
@@ -301,43 +310,50 @@ Nx = length(x_txts);
 figure; hold on;
 % Plot the true value first
 plot([-1,Nx+1],[s_true s_true], 'k','LineWidth', 1.5);
+% Trim down the data to only the 95% confidence intervals
+s_mat = trimToCI(s_mat,keep_frac);
 % Plot the boxplot showing main data
-boxplot_obj = boxplot2(s_mat);
+boxplot_obj = boxplot2(s_mat,'Whisker',Inf);
 % Add colours to the plot
 for ii = 1:2
     structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
 end
 % Add to the plot the parameter learned for perfect data (if requested)
-if plot_perfect
+if plot_pop
     s_perfect = simResults.s_perfect;
     hold on;
     plot(Nx-0.1,s_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
     plot(Nx+0.1,s_perfect(2),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(2,:));
 end
 % Clean up plot
-smin = min(s_mat(:));
-smax = max(s_mat(:));
-ymin = max([pmin; smin-0.1*(smax-smin)]);
-ymax = min([pmax; smax+0.1*(smax-smin)]);
+pmin = min(s_mat(:));
+pmax = max(s_mat(:));
+ymin = max([y_absmin; pmin-0.1*(pmax-pmin)]);
+ymax = min([y_absmax; pmax+0.1*(pmax-pmin)]);
 axis([0.5 Nx+0.5 ymin ymax]);
 xticks(1:Nx);
 xticklabels(x_txts);
-set(gca,'FontSize',20);
-ylabel('s','Fontsize',24);
-title(['Selective Advantage (',title_txt,')'],'FontSize',20);
+set(gca,'FontSize',20,'LineWidth',2);
+if plot_pop
+    xlabel('$N$','FontSize',24,'Interpreter','latex')
+end
+ylabel('$s$','Fontsize',24,'Interpreter','latex');
+title(['Estimated $s$ (',title_txt,')'],'FontSize',20,'Interpreter','latex');
 
 % Prepare the figure
 figure; hold on;
 % Plot the true value first
 plot([-1,Nx+1],[h_true h_true], 'k','LineWidth', 1.5);
+% Trim down the data to only the 95% confidence intervals
+h_mat = trimToCI(h_mat,keep_frac);
 % Plot the boxplot showing main data
-boxplot_obj = boxplot2(h_mat);
+boxplot_obj = boxplot2(h_mat,'Whisker',Inf);
 % Add colours to the plot
 for ii = 1:2
     structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
 end
 % Add to the plot the parameter learned for perfect data (if requested)
-if plot_perfect
+if plot_pop
     h_perfect = simResults.h_perfect;
     hold on;
     plot(Nx-0.1,h_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
@@ -345,27 +361,32 @@ if plot_perfect
 end
 plot([-1,Nx+1],[h_true h_true], 'k','LineWidth', 1.5);
 % Clean up plot
-hmin = min(h_mat(:));
-hmax = max(h_mat(:));
-ymin = max([pmin; hmin-0.1*(hmax-hmin)]);
-ymax = min([pmax; hmax+0.1*(hmax-hmin)]);
+pmin = min(h_mat(:));
+pmax = max(h_mat(:));
+ymin = max([y_absmin; pmin-0.1*(pmax-pmin)]);
+ymax = min([y_absmax; pmax+0.1*(pmax-pmin)]);
 axis([0.5 Nx+0.5 ymin ymax]);
 xticks(1:Nx);
 xticklabels(x_txts);
-set(gca,'FontSize',20);
-ylabel('h','Fontsize',24);
-title(['Dominance (',title_txt,')'],'FontSize',20);
+set(gca,'FontSize',20,'LineWidth',2);
+if plot_pop
+    xlabel('$N$','FontSize',24,'Interpreter','latex')
+end
+ylabel('$h$','Fontsize',24,'Interpreter','latex');
+title(['Estimated $h$ (',title_txt,')'],'FontSize',20,'Interpreter','latex');
 
 % Prepare the figure
 figure; hold on;
+% Trim down the data to only the 95% confidence intervals
+l2_mat = trimToCI(l2_mat,keep_frac);
 % Plot the boxplot showing main data
-boxplot_obj = boxplot2(l2_mat);
+boxplot_obj = boxplot2(l2_mat,'Whisker',Inf);
 % Add colours to the plot
 for ii = 1:2
     structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
 end
 % Add to the plot the parameter learned for perfect data (if requested)
-if plot_perfect
+if plot_pop
     l2_perfect = log(simResults.l2_perfect);
     hold on;
     plot(Nx-0.1,l2_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
@@ -378,6 +399,9 @@ end
 % Clean up plot
 xticks(1:Nx);
 xticklabels(x_txts);
-set(gca,'FontSize',20);
-ylabel('L_2','Fontsize',24);
-title(['Trajectory L_2 Error (',title_txt,')'],'FontSize',20);
+set(gca,'FontSize',20,'LineWidth',2);
+if plot_pop
+    xlabel('$N$','FontSize',24,'Interpreter','latex')
+end
+ylabel('$L_2$','Fontsize',24,'Interpreter','latex');
+title(['Trajectory $L_2$ Error (',title_txt,')'],'FontSize',20,'Interpreter','latex');
