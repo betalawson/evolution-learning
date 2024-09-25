@@ -1,7 +1,7 @@
-function [fitfun, Flib, K, texts] = evolutionLearning(data, selection_type, options)
+function [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type, options)
 %
-%   [X_dash_data, Flib, K, texts] = evolutionLearning(data, selection_type)
-%   [X_dash_data, Flib, K, texts] = evolutionLearning(data, selection_type, options)
+%   [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type)
+%   [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type, options)
 %
 % This function applies the evolutionary learning approach to attempt to
 % identify the selective strength that is present in provided trajectory
@@ -29,8 +29,9 @@ function [fitfun, Flib, K, texts] = evolutionLearning(data, selection_type, opti
 %
 %  OUTPUTS:
 %
-%         fitfun - The functions for F(x) and F'(x) learned by gradient
-%                  estimation.
+%        fitfuns - The functions for F(x) and F'(x) learned by gradient
+%                  estimation, one struct with fields F and Fdash per
+%                  replicate
 %
 %           Flib - The library of functions that was used for fitting.
 %                  These are components of fitness F(x) = sum( k_i f_i(x) )
@@ -64,72 +65,59 @@ end
 
 %%% DERIVATIVE ESTIMATION
 
-% Only perform if data wasn't supplied
-if isempty(options.Xdash_data)
-
-    % Initialise the data storage for derivative information
-    Xdash_data = cell(1,N_rep);
-
-    % Derivative estimation is performed separately for each replicate in data
-    N_obs = 0;
-    for k = 1:N_rep
+% Loop over the number of data replicates provided, derivative estimation
+% is performed (if necessary) separately for each data replicate
+N_obs = zeros(1,N_rep);
+fitfuns = cell(1,N_rep);
+for k = 1:N_rep
+    
+    % Store how many observations there are in this replicate
+    N_obs(k) = size(data{k}.X,2);
+    
+    % If derivative data was not provided, estimate it via functional fit
+    if ~isfield(data{k},'Xdash')
         
-        % Prepare storage
-        N_obs_here = length(data{k}.t);
-        Xdash_data{k} = zeros(N_feat, N_obs_here);
-        % Keep a running total of number of observations for later
-        N_obs = N_obs + N_obs_here;
-    
-        % Fit function and estimate the derivative for each feature
-        f_funs = cell(N_feat,1);
-        fdash_funs = cell(N_feat,1);
-        for n = 1:N_feat    
-            % Fit a function
-            [f,fdash] = fitFunction(data{k}.t, data{k}.X(n,:),options);
-            % Evaluate and store derivative estimates
-            Xdash_data{k}(n,:) = fdash(data{k}.t);
-            % Store the function fits themselves (as function handles)
-            f_funs{n} = f;
-            fdash_funs{n} = fdash;
-        end    
-    end
-
-    % Create a single evaluatable function that returns a vector for f and f'
-    fitfun.f_funs = f_funs;
-    fitfun.fdash_funs = fdash_funs;
-    
-    
-% Otherwise just use the provided data and return a NaN for fit function
-else
-    
-    if ~iscell(options.Xdash_data)
-        Xdash_data{1} = options.Xdash_data;
+        % Use the function fitter for this set of data
+        [F, Fdash] = constructSimplexFit(data{k}, options);
+        
+        % Evaluate and store the derivative estimates it generates
+        data{k}.Xdash = Fdash(data{k}.t);
+        
+        % If using the smoothed function as the X data, overwrite it here
+        if options.use_smoothed
+            data{k}.X = F(data{k}.t);
+        end
+        
+        % Store the fit functions here (can be useful for later plotting)
+        fitfuns{k} = struct('F',F,'Fdash',Fdash);
+        
     else
-        Xdash_data = options.Xdash_data;
+        
+        % No functional fit was performed so just store dummy data
+        fitfuns{k} = struct('F',NaN,'Fdash',NaN);
+        
     end
-    N_obs = sum( cellfun( @(x) length(x), Xdash_data ) );
-    fitfun = NaN;
+    
 end
-
-
+        
 
 %%% EQUATION LEARNING
 
 % Before data compilation, prepare storage
-X_data_all = zeros(N_feat, N_obs);
-Xdash_data_all = zeros(N_feat, N_obs);
+X_data_all = zeros(N_feat, sum(N_obs));
+Xdash_data_all = zeros(N_feat, sum(N_obs));
 
 % Loop over each replicate and add its data to the total observation list
 start_loc = 0;
 for k = 1:N_rep
 
     % Define location in observation list for these replicates
-    N_obs_here = length(data{k}.t);
-    loc = start_loc + (1:N_obs_here);
-    start_loc = start_loc + N_obs_here;
+    loc = start_loc + (1:N_obs(k));
     % Store the data in the master datalist in this location
     X_data_all(:,loc) = data{k}.X;
-    Xdash_data_all(:,loc) = Xdash_data{k};
+    Xdash_data_all(:,loc) = data{k}.Xdash;
+    % Advance start location in preparation for next loop
+    start_loc = start_loc + N_obs(k);
     
 end
 

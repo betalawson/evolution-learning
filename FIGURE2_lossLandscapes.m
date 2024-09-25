@@ -12,18 +12,19 @@ s_true = 0.2;             % Selective advantage
 h_true = 0.8;             % Dominance in heterozygotes
 x0 = [0.2;0.8];           % Initial proportions
 
+% Specify the data to which the parameters are being fit
+data_WF = true;           % Use Wright-Fisher model or replicator
+N_pop = 5000;             % Population size for WF model
+N_gen = 50;               % Number of generations in WF model (or t_end in replicator)
+N_obs = 11;               % Number of observation points in the data
+
 % Specify parameter search ranges (to plot over)
 s_range = [0,1];
-%h_range = [-1, 2];
 h_range = [-0.5, 1.5];
 % Number of points to use in surface plotting (in each dimension)
 Npts = 501;
 
-% Specify the timepoints to observe
-Nobs = 26;
-t_end = 50;
-tpts = linspace(0,t_end,Nobs);
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% DATA REGENERATION
 
@@ -32,18 +33,53 @@ if nargin < 1
     regenerate = false;
 end
 
+% Set data filename according to whether using perfect replicator data or
+% generated Wright-Fisher data
+if data_WF
+    data_filename = 'DATA_WF_lossSurfaces.mat';
+else
+    data_filename = 'DATA_REP_lossSurfaces.mat';
+end
+
 % Generate the data if not present or asked to regenerate
-if regenerate || ~exist('DATA_lossSurfaces.mat', 'file')
+if regenerate || ~exist(data_filename', 'file')
    
-    % Define the replicator RHS for two allele case
+
+    
+    % Define the type I replicator RHS for the two allele case
     fitness = @(x,s,h) [1 + s, 1 + h*s; 1 + h*s, 1] * x;
     df = @(x,s,h) x .* ( fitness(x,s,h) - sum(x .* fitness(x,s,h), 1) );
-
-    % Generate synthetic data including derivative
+    % Prepare ODE solution options
     odeoptions = odeset('AbsTol',1e-8,'RelTol',1e-8);
-    [T,x_data] = ode15s( @(t,x) df(x,s_true,h_true), tpts, x0, odeoptions );
-    x_data = x_data';
-    dx_data = df(x_data, s_true, h_true);
+    
+    % Prepare the timepoints/generations for observations
+    tpts = round(linspace(0,N_gen,N_obs));
+    
+    % Generate synthetic data including derivative
+    if data_WF
+        
+        % Set seed for repeatability
+        rng(7);
+        
+        % Simulate the Wright-Fisher model with type I selection
+        X_data = wrightFisher(N_pop, N_gen, x0, fitness, 1);
+        
+        % Cut down to only the observable locations
+        X_data = X_data(:,tpts);
+        
+        % Approximate the derivatives using functional fit
+        [F, Fdash] = constructSimplexFit(struct('t',tpts,'X',X_data));
+        dX_data = Fdash(tpts);
+        
+    else
+        
+        % Simulate the replicator
+        [T,X_data] = ode15s( @(t,x) df(x,s_true,h_true), tpts, x0, odeoptions );
+        X_data = X_data';
+        % Generate associated derivative data direct from replicator
+        dX_data = df(X_data, s_true, h_true);
+        
+    end
 
     % Build the grid of points used to show the optimisation surface
     [sm,hm] = meshgrid( linspace(s_range(1), s_range(2), Npts), linspace(h_range(1), h_range(2), Npts) );
@@ -59,16 +95,16 @@ if regenerate || ~exist('DATA_lossSurfaces.mat', 'file')
             [T,x_here] = ode15s( @(t,x) df(x, sm(i,j), hm(i,j)), tpts, x0, odeoptions );
             x_here = x_here';
             % Evaluate RHS for derivatives
-            dx_here = df(x_data, sm(i,j), hm(i,j) );
+            dX_here = df(X_data, sm(i,j), hm(i,j) );
             % Calculate error
-            f_opt(i,j) = norm(x_here - x_data,'fro');
-            df_opt(i,j) = norm(dx_here - dx_data,'fro');
+            f_opt(i,j) = norm(x_here - X_data,'fro');
+            df_opt(i,j) = norm(dX_here - dX_data,'fro');
         
         end
     end
 
     % Save the data
-    save('DATA_lossSurfaces.mat', 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
+    save(data_filename, 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
 
     % Safety pause
     pause(5);
@@ -82,7 +118,7 @@ end
 N_slots = 11;
 
 % Load in the data
-load('DATA_lossSurfaces.mat', 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
+load(data_filename, 's_true', 'h_true', 'sm', 'hm', 'f_opt', 'df_opt');
 
 % Load colormaps
 load('extra_colormaps.mat','viridis');

@@ -1,9 +1,9 @@
 function [funs, texts] = createPolynomialLibrary(N_feat, orders, names, interactions)
 %
-%    [funs, texts] = createBasicLibrary(N, m)
-%    [funs, texts] = createBasicLibrary(N, m, names)
-%    [funs, texts] = createBasicLibrary(N, m, [], interactions) 
-%    [funs, texts] = createBasicLibrary(N, m, names, interactions)
+%    [funs, texts] = createPolynomialLibrary(N, m)
+%    [funs, texts] = createPolynomialLibrary(N, m, names)
+%    [funs, texts] = createPolynomialLibrary(N, m, [], interactions) 
+%    [funs, texts] = createPolynomialLibrary(N, m, names, interactions)
 %
 % This function creates a set of polynomial library functions, composed of
 % all polynomials up to a specified order that obey the specified structure
@@ -70,7 +70,7 @@ for k = 1:N_feat
     %%% Second-order terms
     if ismember(2,orders)
         for i = 1:N_feat
-            for j = 1:N_feat
+            for j = i:N_feat
                 % Only include if species i,j can contribute to fitness of k
                 if interactions(i,k) && interactions(j,k) && interactions(i,j)
                     funs{end+1} = @(X) [zeros(k-1,size(X,2)); X(i,:) .* X(j,:); zeros(N_feat-k,size(X,2)) ];
@@ -83,8 +83,8 @@ for k = 1:N_feat
     %%% Third-order terms
     if ismember(3,orders)
         for i = 1:N_feat
-            for j = 1:N_feat
-                for l = 1:N_feat
+            for j = i:N_feat
+                for l = j:N_feat
                     % Only include if species i,j,l can contribute to fitness of k
                     if interactions(i,k) && interactions(j,k) && interactions(l,k) && interactions(i,j) && interactions(i,l) && interactions(j,l)
                         funs{end+1} = @(X) [zeros(k-1,size(X,2)); X(i,:) .* X(j,:) .* X(l,:); zeros(N_feat-k,size(X,2)) ];

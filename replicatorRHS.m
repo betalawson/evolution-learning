@@ -19,5 +19,5 @@ else
     dX = X .* ( f / (X' * f) - 1 );
 end
 
-% Numerically ensure no net change in total proportion
-dX = dX - mean(dX);
+% Use final row of dX to instead lock the solution to probability simplex
+dX(end) = 1 - sum(X);    % Associated with a zero mass (algebraic)

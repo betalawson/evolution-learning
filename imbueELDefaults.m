@@ -28,16 +28,18 @@ ELoptions.symmetric_payoff = true;          % Specifies whether to target learni
 ELoptions.Xdash_data = [];                  % By default, learn derivatives from data (option exists so user can provide derivative data)             
 
 % Parameters used for function fitting
+ELoptions.use_smoothed = true;             % Specifies whether to replace the input data with the values of the fitted function (additional smoothing)
 ELoptions.evolutionary_derivative = true;   % Enforces derivatives summing to zero across components
 ELoptions.deriv_method = 'gp';              % Method for derivative estimation (smoothing)
 ELoptions.visualise_fit = false;            % Visualise the function fits used for derivative estimation
 ELoptions.kernel_bandwidth = -1;            % Local polynomial regression: bandwidth. Set to -1 for "auto" (2.5 times average point separation)
-ELoptions.polynomial_order = 4;             % Local polynomial regression: polynomial order
+ELoptions.polynomial_order = 2;             % Local polynomial regression: polynomial order
 ELoptions.polyfit_regularisation = 1e-7;    % Local polynomial regression: ridge parameter (used to regularise ill-defined regression problems)
 
 % Parameters used for determination of library coefficients
 ELoptions.force_positive = true;            % Force coefficients to be positive
 ELoptions.shrinkage = 1e-3;                 % Extent of shrinkage to apply (L2 penalisation on non-zero library term coefficients). Set to 0 to apply no shrinkage. 
+ELoptions.nlin_silent = false;              % If 'true', calls to nlinfit inside coefficient determination routines will supress common warnings
 
 % Default names
 for k = 1:N_feat

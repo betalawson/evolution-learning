@@ -34,7 +34,7 @@ load('problems_inheritance.mat', 'allele_standard1', 'allele_transient1', 'allel
 
 % Create a cell array of cell arrays that contains the type I and type II
 % versions of each problem to be looped over
-problems_list = { {allele_standard1, allele_standard2}, {allele_transient1, allele_transient2}, {allele_persistent1, allele_persistent2} };
+problems_list = { allele_standard, allele_transient, allele_persistent };
 
 % Specify the filename "suffixes" for each problem in the master list
 problem_filenames = {'std', 'tran', 'pers'};
@@ -43,8 +43,16 @@ problem_names = {'Standard', 'Transient', 'Persistent'};
 % Loop over and run each problem from the problem list separately
 for P = 1:length(problems_list)
     
-    % Load in current problems (type I and type II) from master list
-    problems = problems_list{P};
+    % Load in current problem from master list
+    base_problem = problems_list{P};
+    
+    % Create a type I and type II selection version of the problem
+    problems = cell(1,2);
+    for type = 1:2
+        problem = base_problem;
+        problem.selection_type = type;
+        problems{type} = problem;
+    end
         
     %%% PASTE OTHER METHODS HERE IF THEY ARE ALSO TO BE RUN
     
@@ -368,15 +376,13 @@ y_absmax = 1.75;
           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%% FIX OTHERS TO ALSO TRIM
-
 % Extract results
 s1_mat = trimToCI(simResults.s1_mat,keep_frac);
-s2_mat = simResults.s2_mat;
-h12_mat = simResults.h12_mat;
-h13_mat = simResults.h13_mat;
-h23_mat = simResults.h23_mat;
-l2_mat = log(simResults.l2_mat);
+s2_mat = trimToCI(simResults.s2_mat,keep_frac);
+h12_mat = trimToCI(simResults.h12_mat,keep_frac);
+h13_mat = trimToCI(simResults.h13_mat,keep_frac);
+h23_mat = trimToCI(simResults.h23_mat,keep_frac);
+l2_mat = trimToCI(log(simResults.l2_mat),keep_frac);
 s1_perfect = simResults.s1_perfect;
 s2_perfect = simResults.s2_perfect;
 h12_perfect = simResults.h12_perfect;
@@ -397,7 +403,7 @@ p_perfects = {s1_perfect, s2_perfect, h12_perfect, h13_perfect, h23_perfect};
 
 % Specify the parameter names (letters and descriptions)
 %%% (DESCRIPTIONS CURRNETLY UNUSED, TOO LONG FOR PLOTS )
-p_names = {'s_1', 's_2', 'h_{12}', 'h_{13}', 'h_{23}'};
+p_names = {'$s_1$', '$s_2$', '$h_{12}$', '$h_{13}$', '$h_{23}$'};
 p_descs = {'Selective Advantage of Allele 1', 'Selective Advantage of Allele 2', 'Dominance of Allele 1 over 2', 'Dominance of Allele 1 over 3', 'Dominance of Allele 2 over 3'}; 
 
 % Prepare plot
@@ -430,7 +436,6 @@ for pnum = 1:length(p_mats)
         structfun(@(x) set(x(ii,:), 'color', type_clrs(ii,:), 'markeredgecolor', type_clrs(ii,:), 'LineWidth', 2), boxplot_obj);
     end
     % Add to the plot the parameter learned for perfect data
-    hold on;
     plot(N_pops+0.9,p_perfect(1),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(1,:));
     plot(N_pops+1.1,p_perfect(2),'.','MarkerSize',40, 'MarkerEdgeColor',type_clrs(2,:));
     

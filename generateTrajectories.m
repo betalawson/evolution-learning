@@ -72,8 +72,46 @@ for k = 1:N_prob
         
         % Create a vector of timepoints to use in storing ODE simulation output
         timepoints = linspace(0,N_gen*t_gen,N_simpts);
-        % Simulate the given dynamics' replicator equation
-        [T_rep,X_rep] = ode15s( @(t,X) 1/t_gen * replicatorRHS(X,fitness,selection_type), timepoints, X0);
+        % Prepare a mass matrix to confine results to probability simplex
+        M = eye(N_feat);
+        M(N_feat,N_feat) = 0;
+        % Initialise ODE solve tolerance and most strict tolerance
+        tol = 1e-3;
+        min_tol = 1e-10;
+        running = true;
+        success = false;
+        
+        % Disable warnings as we will try many tolerances
+        warning('off','MATLAB:ode15s:IntegrationTolNotMet');
+        
+        % Solve the replicator ODE
+        while running
+
+            % Attempt solve using the current tolerance       
+            odeoptions = odeset('Mass',M,'AbsTol',tol,'RelTol',tol);
+            [T_rep,X_rep] = ode15s( @(t,X) 1/t_gen * replicatorRHS(X,fitness,selection_type), timepoints, X0, odeoptions);
+                                   
+            % Terminate if integration successful or tolerance too low
+            if abs(T_rep(end) - timepoints(end)) < 1e-10 || tol <= min_tol
+                running = false;
+                success = true;
+            end
+            
+            % Terminate with failure if tolerance too small
+            if tol <= min_tol && ~success
+                running = false;
+                fprintf('\n WARNING: There was a failure to solve the ODE even with strictest tolerance! Output will be truncated.\n');
+            end
+                
+            % Otherwise, decrease tolerance and try again
+            tol = tol * 0.01;
+            
+        end
+                  
+        % Re-enable warnings to not bother the user's session
+        warning('on','MATLAB:ode15s:IntegrationTolNotMet');
+        
+        % Store the trajectory
         traj_rep.t = T_rep;
         traj_rep.X = X_rep';
         

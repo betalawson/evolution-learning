@@ -26,15 +26,25 @@ options = imbueELDefaults(options);
 % MODELFUN is defined below, the replicator with type II selection.
 % Initial condition (BETA0) is taken as all ones.
 
-% If forcing positive, optimise by nonlinear fitting in logspace
+% Use options to decide whether to supress warnings produced by nlinfit
+if options.nlin_silent
+    warning('off','all');
+end 
+
+% Set "base" model according to selection type
+N_funs = length(F);
+K0 = 1/sqrt(N_funs) * ones(N_funs,1);
+
+% Append a value of zero as "data" to punish this cost
+Yfit = [X_dash_data(:); 0];
+
+% If forcing positive, optimise by nonlinear fitting in square root space
 if options.force_positive
     
     % Create fitting function with square transform to force positive and
     % appended "cost" of large values for coefficients
-    fitfun = @(sqrtK,X) [ modelfun(X,F,sqrtK.^2); sqrt(options.shrinkage)*norm(sqrtK.^2 - 1/sqrt(length(F))) ];
+    fitfun = @(sqrtK,X) [ modelfun(X,F,sqrtK.^2); sqrt(options.shrinkage)*norm(sqrtK.^2 - K0) ];
 
-    % Append a value of zero as "data" to punish this cost
-    Yfit = [X_dash_data(:); 0];
     % Fit the model    
     sqrtK = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
     K = sqrtK.^2;
@@ -44,13 +54,16 @@ else
     
     % Create fitting function with exponential transform to force positive
     % and appended "cost" of large values for coefficients
-    fitfun = @(K,X) [ modelfun(X,F,K); sqrt(options.shrinkage)*norm(K - 1/sqrt(length(F))) ];
+    fitfun = @(K,X) [ modelfun(X,F,K); sqrt(options.shrinkage)*norm(K - K0) ];
 
-    % Append a value of zero as "data" to punish this cost
-    Yfit = [X_dash_data(:); 0];
     % Fit the model
     K = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
     
+end
+
+% If warnings were turned off, re-enable them to protect user's session
+if options.nlin_silent
+    warning('on','all');
 end
 
 end
