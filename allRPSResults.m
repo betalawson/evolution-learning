@@ -1,4 +1,4 @@
-function FIGURE6_RPSTesting(regenerate)
+function allRPSResults(regenerate)
 % This function produces the figures in the paper that demonstrate how
 % equation learning performs for identifying rock paper scissors style
 % dynamics, which naturally oscillate
@@ -24,6 +24,7 @@ data_prefix = 'DATA_RPS_';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 %%% INPUT HANDLING
 
 % Assume not regenerating data unless specifically requested
@@ -41,8 +42,7 @@ end
 
 %%% PROBLEM PREPARATION
 
-% Load in the rock-paper-scissors problems and store these in a list of
-% problems to run
+% Load in the rock-paper-scissors problems
 load('problems_RPS.mat','RPS_balanced','RPS_attract','RPS_repel');
 
 % Create a cell array of cell arrays that contains the problem list
@@ -183,8 +183,6 @@ for p = 1:N_problems
         % Plot the parameter estimation boxplots
         plotParamsBoxplotOneType( setfield(simResults, 'params_true', params1_true), x_txts, '', ['FIG6b_',problem_filenames{p},'_',method_filenames{m},'_popsParams'], save_figs, 1, true );
         plotParamsBoxplotOneType( setfield(simResults, 'params_true', params2_true), x_txts, '', ['FIG6b_',problem_filenames{p},'_',method_filenames{m},'_popsParams'], save_figs, 2, true );
-
-        keyboard
         
     end
     

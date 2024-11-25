@@ -1,4 +1,4 @@
-function FIGURE4_triAlleleTesting(regenerate)
+function allTrialleleResults(regenerate)
 % This function produces the figures in the paper that demonstrate how
 % equation learning performs for identifying selection strength and
 % dominance for a bi-allelic inheritance scenario
@@ -23,6 +23,7 @@ sim_gen = 50;
 data_prefix = 'DATA_TRIALL_';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %%% INPUT HANDLING
 

@@ -42,8 +42,7 @@ end
 
 %%% PROBLEM PREPARATION
 
-% Load in the basic problem - type I and type II selection versions.
-% Settings for these will be adjusted as needed
+% Load in the basic problem
 load('problems_basic.mat','allele_basic');
 problem = allele_basic;
 
