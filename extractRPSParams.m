@@ -24,12 +24,7 @@ if type == 1
 else
    
     % Take the average scaling of the diagonal elements
-    try
-        Aii_mean = geomean(diag(A));
-    catch
-        A
-        Aii_mean = geomean(diag(A));
-    end
+    Aii_mean = geomean(diag(A));
     % Scale the matrix by this to make the diagonals approximately unity
     A = A / Aii_mean;
     

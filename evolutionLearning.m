@@ -1,7 +1,7 @@
-function [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type, options)
+function [library, fitfuns] = evolutionLearning(data, selection_type, options)
 %
-%   [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type)
-%   [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type, options)
+%   [library, fitfuns] = evolutionLearning(data, selection_type)
+%   [library, fitfuns] = evolutionLearning(data, selection_type, options)
 %
 % This function applies the evolutionary learning approach to attempt to
 % identify the selective strength that is present in provided trajectory
@@ -22,25 +22,24 @@ function [fitfuns, Flib, K, texts] = evolutionLearning(data, selection_type, opt
 %                  Note that Type I selection is a linear solve
 %
 %        options - A struct of options that the user would like to specify,
-%                  otherwise the default values found in imbueELDefaults.m
-%                  will be used. Available options to change are listed
-%                  there.
+%                  otherwise the default values found in the function
+%                  addDefaultOptions.m will be used. Edit that function to
+%                  adjust defaults.
 %
 %
 %  OUTPUTS:
 %
-%        fitfuns - The functions for F(x) and F'(x) learned by gradient
-%                  estimation, one struct with fields F and Fdash per
-%                  replicate
+%         library - A library object that represents the selective dynamics
+%                   learned in response to the data. Library objects are
+%                   structs with fields:
+%                     F: cell array of library functions, @(x) F(x)
+%                 texts: text description of each library function
+%                coeffs: coefficients associated with each library function
 %
-%           Flib - The library of functions that was used for fitting.
-%                  These are components of fitness F(x) = sum( k_i f_i(x) )
-%
-%              K - Vector of coefficients associated with the library Flib
-%
-%          texts - Names of library functions used for outputting to user
-%                  or to assist in interpretation of the output.
-%
+%         fitfuns - The functions for F(x) and F'(x) learned by gradient
+%                   estimation, one struct with fields F and Fdash per
+%                   provided dataset
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -52,101 +51,132 @@ if ~iscell(data)
 end
 
 % Read out dimensions of various data pieces
-N_rep = length(data);
+N_data = length(data);
 N_feat = size(data{1}.X,1);
 
 % Set all options that weren't pre-specified to their defaults
 if nargin < 3
-    options = imbueELDefaults([], N_feat);
+    options = addDefaultOptions([], N_feat);
 else
-    options = imbueELDefaults(options, N_feat);
+    options = addDefaultOptions(options, N_feat);
+end
+
+% Prepare the function library to learn, currently polynomial libraries
+% are supported (optionally, symmetric-constrained 1st order polynomials)
+if ~options.symmetric_payoff
+    library = createPolynomialLibrary(N_feat, options.library_orders, options.names, options.interactions);
+else
+    library = createSymmetricPayoffLibrary(N_feat, options.names, options.interactions);
 end
 
 
-%%% DERIVATIVE ESTIMATION
+%%% SPLIT HERE BASED ON METHOD
 
-% Loop over the number of data replicates provided, derivative estimation
-% is performed (if necessary) separately for each data replicate
-N_obs = zeros(1,N_rep);
-fitfuns = cell(1,N_rep);
-for k = 1:N_rep
+switch lower(options.regression_type)
     
-    % Store how many observations there are in this replicate
-    N_obs(k) = size(data{k}.X,2);
-    
-    % If derivative data was not provided, estimate it via functional fit
-    if ~isfield(data{k},'Xdash')
+    case {'gradient','gm','gradient-matching','gradient_matching','grad'}
         
-        % Use the function fitter for this set of data
-        [F, Fdash] = constructSimplexFit(data{k}, options);
+        %%% ESTIMATE DERIVATIVES AS REQUIRED
         
-        % Evaluate and store the derivative estimates it generates
-        data{k}.Xdash = Fdash(data{k}.t);
-        
-        % If using the smoothed function as the X data, overwrite it here
-        if options.use_smoothed
-            data{k}.X = F(data{k}.t);
+        % Loop over each data replicate separately, estimating the
+        % derivative if derivative data was not provided
+        N_obs = zeros(1,N_data);
+        fitfuns = cell(1,N_data);
+        for k = 1:N_data
+            
+            % Store how many observations there are in this replicate
+            N_obs(k) = size(data{k}.X,2);
+            
+            % If derivative data was not provided, estimate it via functional fit
+            if ~isfield(data{k},'Xdash')
+                
+                % Use the function fitter for this set of data
+                [F, Fdash] = fitSimplexConstrainedFunction(data{k}, options);
+                
+                % Evaluate and store the derivative estimates it generates
+                data{k}.Xdash = Fdash(data{k}.t);
+                
+                % Store the fit functions here (can be useful for later plotting)
+                fitfuns{k} = struct('F',F,'Fdash',Fdash);
+                
+            else
+                
+                % No functional fit was performed so just store dummy data
+                fitfuns{k} = struct('F',NaN,'Fdash',NaN);
+                
+            end
+            
         end
         
-        % Store the fit functions here (can be useful for later plotting)
-        fitfuns{k} = struct('F',F,'Fdash',Fdash);
         
-    else
+        %%% GATHER TOGETHER DERIVATIVE DATA
         
-        % No functional fit was performed so just store dummy data
-        fitfuns{k} = struct('F',NaN,'Fdash',NaN);
+        % Before data compilation, prepare storage
+        X_data_all = zeros(N_feat, sum(N_obs) );
+        Xdash_data_all = zeros(N_feat, sum(N_obs) );
+
+        % Loop over each data replicate to compile the total dataset
+        start_loc = 0;
+        for k = 1:N_data
+
+            % Define location in observation list for these replicates
+            loc = start_loc + (1:N_obs(k));
+            % Store the data in the master datalist in this location
+            X_data_all(:,loc) = data{k}.X;
+            Xdash_data_all(:,loc) = data{k}.Xdash;
+            % Advance start location in preparation for next loop
+            start_loc = start_loc + N_obs(k);
+    
+        end
+
+        % Numerically ensure all derivative data sums to zero, as required
+        Xdash_data_all = Xdash_data_all - mean(Xdash_data_all);
         
-    end
-    
-end
         
+        %%% USE DERIVATIVE DATA TO ESTIMATE LIBRARY COEFFICIENTS
+        
+        % Method used depends on the type of selection
+        if selection_type == 1   
+            % Type I allows "evolutionary SINDy", linear after transforming
+            library.coeffs = evoSINDy(X_data_all, Xdash_data_all, library.F, options);
+        else
+            % Type II requires using the nonlinear fitter
+            library.coeffs = nonlinearGradientFit(X_data_all, Xdash_data_all, library.F, options);
+        end        
+        
+        
+    case {'least-squares','least_squares','ls','nonlinear','standard'}
+        
+        %%% GATHER TOGETHER DATA
+        
+        % Loop over each dataset and count observations (for initialisation)
+        N_obs = zeros(1,N_data);
+        for k = 1:N_data
+            N_obs(k) = length(data{k}.t);
+        end
 
-%%% EQUATION LEARNING
+        % Now initialise data storage
+        t_data_all = zeros(1, sum(N_obs));
+        X_data_all = zeros(N_feat, sum(N_obs));
+        
+        % Loop over each replicate, adding to the total set of observations
+        start_loc = 0;
+        for k = 1:N_data
 
-% Before data compilation, prepare storage
-X_data_all = zeros(N_feat, sum(N_obs));
-Xdash_data_all = zeros(N_feat, sum(N_obs));
-
-% Loop over each replicate and add its data to the total observation list
-start_loc = 0;
-for k = 1:N_rep
-
-    % Define location in observation list for these replicates
-    loc = start_loc + (1:N_obs(k));
-    % Store the data in the master datalist in this location
-    X_data_all(:,loc) = data{k}.X;
-    Xdash_data_all(:,loc) = data{k}.Xdash;
-    % Advance start location in preparation for next loop
-    start_loc = start_loc + N_obs(k);
+            % Define location in observation list for these replicates
+            loc = start_loc + (1:N_obs(k));
+            % Store the data in the master datalist in this location
+            t_data_all(loc) = data{k}.t;
+            X_data_all(:,loc) = data{k}.X;
+            % Advance start location in preparation for next loop
+            start_loc = start_loc + N_obs(k);
     
+        end
+        
+        
+        %%% USE THE NONLINEAR REPLICATOR FITTER TO SET COEFFICIENTS
+        
+        % This takes place in a separate function
+        library.coeffs = nonlinearReplicatorFit(t_data_all, X_data_all, library, selection_type, options);
+        
 end
-
-% Regularise derivative estimates to ensure they correctly sum to zero, if
-% that option was supplied
-if options.evolutionary_derivative
-    Xdash_data_all = Xdash_data_all - mean(Xdash_data_all);
-end
-
-% Prepare a basic library of polynomials to given order unless specifically
-% targetting a symmetric payoff matrix
-if ~options.symmetric_payoff
-    [Flib, texts] = createPolynomialLibrary(N_feat, options.library_orders, options.names, options.interactions);
-else
-    [Flib, texts] = createSymmetricPayoffLibrary(N_feat, options.names, options.interactions);
-end
-
-% Type I selection allows standard SINDy after transforming library
-if selection_type == 1
-    
-    % Convert this to a library of replicator-style functions
-    Frep = convertToReplicatorLibrary(Flib);
-    
-    % Use standard SINDy on the master dataset
-    K = SINDy(X_data_all, Xdash_data_all, Frep, options);
-    
-% Type II selection requires the nonlinear solver
-else
-    K = nonlinearReplicatorFit(X_data_all, Xdash_data_all, Flib, options);
-end
-    
-    

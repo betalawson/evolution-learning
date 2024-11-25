@@ -1,15 +1,14 @@
-function ELoptions = imbueELDefaults(options, N_feat)
+function ELoptions = addDefaultOptions(options, N_feat)
 %
-%     ELoptions = imbueELDefaults(ELoptions)
-%     ELoptions = imbueELDefaults(ELoptions, N_spec)
+%     ELoptions = addDefaultOptions(ELoptions)
+%     ELoptions = addDefaultOptions(ELoptions, N_feat)
 %
-% This function applies default options for evolution learning or for the
-% subfunctions used within the evolution learning methodology. Where the
-% user provides input options to this function, they are retained, so that
-% only unspecified options receive their default options. If the number of
-% features is not provided, it is set to 0 (meaningless, but useful for
-% specifying options that do not depend on feature interactions or names)
-
+% This function fills out an options struct with default values, wherever
+% the values for options are not already provided. If the number of
+% features, N_feat, is not provided, it is set to 0 (meaningless, but
+% useful for specifying options that do not depend on feature interactions
+% or names)
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if nargin < 2
@@ -23,22 +22,22 @@ end
 
 ELoptions.library_orders = 0:2;             % Maximum order for polynomial library
 ELoptions.interactions = true(N_feat);      % All species interact by default
-ELoptions.symmetric_payoff = true;          % Specifies whether to target learning a symmetric payoff matrix
+ELoptions.symmetric_payoff = false;         % Specifies whether to target learning a symmetric payoff matrix
+
+ELoptions.regression_type = 'grad';         % Use 'grad' for gradient matching regression, or 'standard' for traditional least squares regression
 
 ELoptions.Xdash_data = [];                  % By default, learn derivatives from data (option exists so user can provide derivative data)             
 
 % Parameters used for function fitting
-ELoptions.use_smoothed = true;             % Specifies whether to replace the input data with the values of the fitted function (additional smoothing)
-ELoptions.evolutionary_derivative = true;   % Enforces derivatives summing to zero across components
 ELoptions.deriv_method = 'gp';              % Method for derivative estimation (smoothing)
 ELoptions.visualise_fit = false;            % Visualise the function fits used for derivative estimation
 ELoptions.kernel_bandwidth = -1;            % Local polynomial regression: bandwidth. Set to -1 for "auto" (2.5 times average point separation)
-ELoptions.polynomial_order = 2;             % Local polynomial regression: polynomial order
+ELoptions.polynomial_order = 4;             % Local polynomial regression: polynomial order
 ELoptions.polyfit_regularisation = 1e-7;    % Local polynomial regression: ridge parameter (used to regularise ill-defined regression problems)
 
 % Parameters used for determination of library coefficients
 ELoptions.force_positive = true;            % Force coefficients to be positive
-ELoptions.shrinkage = 1e-3;                 % Extent of shrinkage to apply (L2 penalisation on non-zero library term coefficients). Set to 0 to apply no shrinkage. 
+ELoptions.shrinkage = 1e-6;                 % Extent of shrinkage to apply (L2 penalisation on non-zero library term coefficients). Set to 0 to apply no shrinkage. 
 ELoptions.nlin_silent = false;              % If 'true', calls to nlinfit inside coefficient determination routines will supress common warnings
 
 % Default names

@@ -88,16 +88,13 @@ for k = 1:N_gen
     end
     
     % Check if any expected proportions outside of [0,1] (w/ tolerance)
-    adjust_tol = 1e-14;
+    adjust_tol = 1e-12;
     if any(p < -adjust_tol) || any(p > 1+adjust_tol)
         error('Current choice of fitness and selection produced inappropriate porportions. Check specification of both.');
     end
-    % If didn't exit due to error, pin all values to the [0,1] range
-    p(p<0) = 0;
-    p(p>1) = 1;
-        
-    % Ensure probabilities do actually sum to one (protects against rounding error and the above correction)
-    p = p / sum(p);   
+
+    % Numerical protection - project p onto the probability simplex
+    p = projectOntoSimplex(p);
     
     % Sample from multinomial using the current population 
     C = mnrnd(N_pop, p)';

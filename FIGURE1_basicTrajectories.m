@@ -2,6 +2,9 @@ function FIGURE1_basicTrajectories()
 
 %%% SETUP
 
+% Initialise random seed
+rng(7);
+
 % Create a function that parameterises the bi-allelic case in terms of only
 % s and h, with base fitness of 1
 allelePayoff = @(x, s, h) [1 + s, 1 + h * s; 1 + h*s, 1] * x;

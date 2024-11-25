@@ -9,7 +9,7 @@ function printLibrary(K,texts,threshold)
 % to inform them of the system found by SINDy fitting.
 %
 % If a value for 'threshold' is provided, only terms for which the
-% coefficient exceeds that threshold will be printed
+% coefficient exceeds that threshold will be printed.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

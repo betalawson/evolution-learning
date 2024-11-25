@@ -1,9 +1,9 @@
-function [funs, texts] = createPolynomialLibrary(N_feat, orders, names, interactions)
+function library = createPolynomialLibrary(N_feat, orders, names, interactions)
 %
-%    [funs, texts] = createPolynomialLibrary(N, m)
-%    [funs, texts] = createPolynomialLibrary(N, m, names)
-%    [funs, texts] = createPolynomialLibrary(N, m, [], interactions) 
-%    [funs, texts] = createPolynomialLibrary(N, m, names, interactions)
+%    library = createPolynomialLibrary(N, m)
+%    library = createPolynomialLibrary(N, m, names)
+%    library = createPolynomialLibrary(N, m, [], interactions) 
+%    library = createPolynomialLibrary(N, m, names, interactions)
 %
 % This function creates a set of polynomial library functions, composed of
 % all polynomials up to a specified order that obey the specified structure
@@ -21,7 +21,7 @@ function [funs, texts] = createPolynomialLibrary(N_feat, orders, names, interact
 %
 %   interactions: An NxN logical matrix specifying which species are
 %                 allowed to interact in mixed polynomial terms
-%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -39,7 +39,9 @@ if nargin < 4
     interactions = true(N_feat);
 end
 
-% Functions and their associated texts are stored in cell arrays. 
+% Functions and their associated texts are stored in cell arrays. The
+% calculation of how many elements is complex, so we just don't initialise
+% the size and eat the memory allocation costs
 funs = {};
 texts = {};
 
@@ -96,5 +98,9 @@ for k = 1:N_feat
     end
     
 end
+
+% The library is stored as a single object
+library.F = funs;
+library.texts = texts;
 
 end

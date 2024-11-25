@@ -1,9 +1,9 @@
-function [funs, texts] = createSymmetricPayoffLibrary(N_feat, names, interactions)
+function library = createSymmetricPayoffLibrary(N_feat, names, interactions)
 %
-%    [funs, texts] = createSymmetricPayoffLibrary(N)
-%    [funs, texts] = createSymmetricPayoffLibrary(N, names)
-%    [funs, texts] = createSymmetricPayoffLibrary(N, [], interactions) 
-%    [funs, texts] = createSymmetricPayoffLibrary(N, names, interactions)
+%    library = createSymmetricPayoffLibrary(N)
+%    library = createSymmetricPayoffLibrary(N, names)
+%    library = createSymmetricPayoffLibrary(N, [], interactions) 
+%    library = createSymmetricPayoffLibrary(N, names, interactions)
 %
 % This function creates a set of linear frequency-dependence terms that
 % correspond directly to a payoff matrix, with a condition of symmetry
@@ -66,5 +66,9 @@ for k = 1:N_feat
     end
 
 end
+
+% Store these values in the library object
+library.F = funs;
+library.texts = texts;
 
 end

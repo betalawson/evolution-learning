@@ -1,4 +1,4 @@
-function FIGURES1_basicAlleleExample()
+function FIGURE3_basicAlleleExamples()
 % This function simply creates a visual demonstration of the equation
 % learning process and its performance
 
@@ -84,26 +84,24 @@ for s = 1:length(seed_nums)
     end
     
     % Plot the true replicator
-    plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 4, 'color', [0 0 0]);
+    plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 4, 'color', [0.4 0.4 0.4]);
     legend_txt{end+1} = 'True Selective Pressure';
     
-
-    
     % Plot the least squares replicator
-    plot(nlin_traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), nlin_traj.rep.X(1,traj.rep.t <= obs_gen*problem.t_gen), 'LineWidth', 3, 'color', [1 0 0]);
+    plot(nlin_traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), nlin_traj.rep.X(1,traj.rep.t <= obs_gen*problem.t_gen), 'LineWidth', 3, 'color', [0.8 0 0]);
     legend_txt{end+1} = 'Nonlinear Least Squares';
-    plot(nlin_traj.rep.t(traj.rep.t > obs_gen*problem.t_gen), nlin_traj.rep.X(1,traj.rep.t > obs_gen*problem.t_gen), '--', 'LineWidth', 3, 'color', [1 0 0]);
+    plot(nlin_traj.rep.t(traj.rep.t > obs_gen*problem.t_gen), nlin_traj.rep.X(1,traj.rep.t > obs_gen*problem.t_gen), '--', 'LineWidth', 3, 'color', [0.8 0 0]);
     legend_txt{end+1} = '';
     
     % Plot the gradient matched replicator
-    plot(learned_traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), learned_traj.rep.X(1,traj.rep.t <= obs_gen*problem.t_gen), 'LineWidth', 3, 'color', [0 0 1]);
+    plot(learned_traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), learned_traj.rep.X(1,traj.rep.t <= obs_gen*problem.t_gen), 'LineWidth', 3, 'color', [0 0 0.8]);
     legend_txt{end+1} = 'Gradient Matching';
-    plot(learned_traj.rep.t(traj.rep.t > obs_gen*problem.t_gen), learned_traj.rep.X(1,traj.rep.t > obs_gen*problem.t_gen), '--', 'LineWidth', 3, 'color', [0 0 1]);
+    plot(learned_traj.rep.t(traj.rep.t > obs_gen*problem.t_gen), learned_traj.rep.X(1,traj.rep.t > obs_gen*problem.t_gen), '--', 'LineWidth', 3, 'color', [0 0 0.8]);
     legend_txt{end+1} = '';
     
     % Plot the fitted function used for derivative estimates (undo the
     % non-dimensionalisation)
-    plot(traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), Ffit(1,:), 'k--', 'LineWidth', 3, 'color', [0.5 0.5 0.5]);
+    plot(traj.rep.t(traj.rep.t <= obs_gen*problem.t_gen), Ffit(1,:), 'k--', 'LineWidth', 3, 'color', [0.7 0.7 0.7]);
     legend_txt{end+1} = 'Derivative Estimator';
     
     
@@ -117,6 +115,8 @@ for s = 1:length(seed_nums)
     axis square;
     xlabel('Number of Generations','FontSize',20);
     ylabel('Allele Frequency, x_1','FontSize',20);
+    % Manually set axis based on known properties of problem
+    ylim([0.2 1]);
     
     % Add legend to plot if this is first seed
     if s == 1

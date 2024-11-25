@@ -1,4 +1,4 @@
-function plotParamsBoxplot(simResults, x_txts, title_txt, fig_filename, save_figs, plot_pop)
+function plotParamsBoxplot(simResults, x_txts, xlabel_txt, title_txt, fig_filename, save_figs, add_legend, plot_pop)
 %
 % This function plots the values of the inferred parameters from the input
 % structure (stored in the fields 'params_mat' and 'params_true', as well
@@ -11,18 +11,18 @@ function plotParamsBoxplot(simResults, x_txts, title_txt, fig_filename, save_fig
 
 % Specify the colours to use in plotting the two selection types
 plot_clrs = [   [ 0.6, 0.0, 0.0 ];          % Dark red
+                [ 1.0, 0.4, 0.4 ];          % Light red                
                 [ 0.0, 0.0, 0.6 ];          % Dark blue
-                [ 1.0, 0.4, 0.4 ];          % Light red
                 [ 0.4, 0.4, 1.0 ]  ];       % Light blue
           
+% Specify how these should be labelled in (optional) legend
+legend_txts = {'LS S_I', 'GM S_I', 'LS S_{II}', 'GM S_{II}'};
+            
 % Specify the fraction of data to show on the box plot whiskers
-keep_frac = 0.95;
+keep_frac = 1;
 
-% Specify the minimum and maximum allowable values for s and h on the plots
-% These are used where the range of 'keep_frac' proportion of the data
-% becomes too large
-y_absmin = -0.75;
-y_absmax = 1.75;
+% Specify the total maximum length of the y-axis (in parameter space)
+y_abslength = 2.5;
 
 % Figure dimensions
 fig_x = 0.3;
@@ -32,8 +32,13 @@ fig_dy = fig_dx * (1920/1080);
           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Assume perfect value will be plotted unless specifically told
-if nargin < 6
+% Assume legend text will not be added unless specifically requested
+if nargin < 7
+    add_legend = false;
+end
+
+% Assume perfect value will not be plotted if not specifically requested
+if nargin < 8
     plot_pop = false;
 end
 
@@ -69,6 +74,9 @@ for p = 1:N_params
     % Trim down the data to only the requested confidence interval
     p_mat = trimToCI(p_mat, keep_frac);
     
+    % Re-order the data to put type I and type II together
+    p_mat = p_mat(:,[1,3,2,4],:);
+    
     % Plot the boxplot showing the main data
     boxplot_obj = boxplot2(p_mat, 'Whisker', Inf);
     
@@ -82,6 +90,8 @@ for p = 1:N_params
         
         % Extract the perfect values for the current parameter
         p_perfect = cellfun(@(x) x.(Pname), simResults.params_perfect); 
+        % Re-order the perfect data to put type I and type II together
+        p_perfect = p_perfect([1,3,2,4]);
         % Plot these in their appropriate colours
         for ii = 1:size(p_mat,2)
             plot(Nx-0.25+0.1*ii,p_perfect(ii),'.', 'MarkerSize',40, 'MarkerEdgeColor',plot_clrs(ii,:));
@@ -90,6 +100,8 @@ for p = 1:N_params
     end
     
     % Set up the plot axis limits
+    y_absmin = p_true - y_abslength/2;
+    y_absmax = p_true + y_abslength/2;
     pmin = min(p_mat(:));
     pmax = max(p_mat(:));
     ymin = max([y_absmin; pmin-0.1*(pmax-pmin)]);
@@ -100,14 +112,19 @@ for p = 1:N_params
     xticks(1:Nx);
     xticklabels(x_txts);
     set(gca, 'FontSize',20, 'LineWidth',2);
-    if plot_pop
-        xlabel('$N$', 'FontSize',24, 'Interpreter','latex');
-    end
+    xlabel(xlabel_txt, 'FontSize',24, 'Interpreter','latex');
     ylabel(['$',Pname,'$'], 'FontSize',24, 'Interpreter','latex');
     if ~isempty(title_txt)
         title(['Estimated $',Pname,'$ (',title_txt,')'], 'FontSize',20, 'Interpreter','latex');
     else
         title(['Estimated $',Pname,'$'], 'FontSize',20, 'Interpreter','latex');
+    end
+    
+    % Add a legend if requested
+    if add_legend
+        for ii = 1:size(p_mat,2)
+            text(Nx-0.5, ymax - (ymax - ymin)*(0.05 + 0.075*(ii-1)), legend_txts{ii}, 'FontSize', 16, 'FontName', 'DejaVu Sans Mono', 'Color', plot_clrs(ii,:));
+        end
     end
     
     % Save the figure and then close it (if save flag set)

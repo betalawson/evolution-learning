@@ -1,63 +1,68 @@
-function K = nonlinearReplicatorFit(X_data, X_dash_data, F, options)
+function K = nonlinearReplicatorFit(t_data, X_data, library, selection_type, options)
 %
-%     K = nonlinearReplicatorFit(X_data, X_dash_data, F)
-%     K = nonlinearReplicatorFit(X_data, X_dash_data, F, options)
+%     K = nonlinearReplicatorFit(X_data, X_dash_data, F, selection_type)
+%     K = nonlinearReplicatorFit(X_data, X_dash_data, F, selection_type, options)
 %
-% This function takes a series of observations regarding how the state of a
-% system relates to its rate of change, as specified by inputs X_data and
-% X_dash_data, and attempts to determine the coefficients for a library of
-% functions, F, that specify this relationship indirectly as contributions
-% to the fitness in a replicator equation with type II selection. This
-% requires a non-linear solve, as opposed to type I which is linear and
-% does not require usage of this function.
-%
+% This function takes a series of observations of feature frequency data
+% over time, as specified by inputs t_data and X_data, and attempts to
+% determine the coefficients for a library of functions, F, that when taken
+% together to determine the fitness, produce replicator trajectories that
+% match that data.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% If options are not provided, use default options
+% Set all options that weren't pre-specified to their defaults
 if nargin < 4
     options = [];
 end
-options = imbueELDefaults(options);
+options = addDefaultOptions(options);
 
-% Use the built-in nonlinear fitter,    BETA = nlinfit(X,Y,MODELFUN,BETA0)
-% Observations (X) are the system state observations, X_data. These are
-% kept in matrix form but converted to vectors in modelfun.
-% Outputs (Y) are the system rates of change, X_dash_data, as a vector.
-% MODELFUN is defined below, the replicator with type II selection.
-% Initial condition (BETA0) is taken as all ones.
-
-% Use options to decide whether to supress warnings produced by nlinfit
+% Use options to decide whether to supress common nlinfit warnings
 if options.nlin_silent
     warning('off','all');
 end 
 
-% Set "base" model according to selection type
-N_funs = length(F);
-K0 = 1/sqrt(N_funs) * ones(N_funs,1);
+% Use the built-in nonlinear fitter,    BETA = nlinfit(X,Y,MODELFUN,BETA0)
+% Covariates (X) are the timepoints where data was recorded, t_data.
+% Responses (Y) are the observed system states at those timepoints.
+% MODELFUN is defined below, and simulates the replicator equation.
+% Initial condition (BETA0) is taken as all ones.
 
-% Append a value of zero as "data" to punish this cost
-Yfit = [X_dash_data(:); 0];
+% Set "base" model according to the type of selection - this is mostly just
+% to match the approaches taken for gradient matching
+N_funs = length(library.F);
+if selection_type == 2
+    K0 = 1/sqrt(N_funs) * ones(N_funs,1);
+else
+    K0 = zeros(N_funs,1);
+end
+
+% Append a value of zero as "data" that is used to punish parameters
+% differing from the base model
+Yfit = [X_data(:); 0];
+
+% Grab out the initial point in the data as the starting point
+X0 = X_data(:,1);
 
 % If forcing positive, optimise by nonlinear fitting in square root space
 if options.force_positive
-    
+        
     % Create fitting function with square transform to force positive and
-    % appended "cost" of large values for coefficients
-    fitfun = @(sqrtK,X) [ modelfun(X,F,sqrtK.^2); sqrt(options.shrinkage)*norm(sqrtK.^2 - K0) ];
-
-    % Fit the model    
-    sqrtK = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
+    % append "cost" of large values for coefficients
+    fitfun = @(sqrtK,t) [ evaluateReplicator(t,sqrtK.^2,X0,library,selection_type); sqrt(options.shrinkage)*norm(sqrtK.^2 - K0) ];
+    
+    % Fit the model
+    sqrtK = nlinfit( t_data, Yfit, fitfun, ones(N_funs,1));
     K = sqrtK.^2;
     
-% Otherwise, optimise using standard nonlinear fitting
 else
     
-    % Create fitting function with exponential transform to force positive
-    % and appended "cost" of large values for coefficients
-    fitfun = @(K,X) [ modelfun(X,F,K); sqrt(options.shrinkage)*norm(K - K0) ];
-
+    % Create fitting function with square transform to force positive and
+    % append "cost" of large values for coefficients
+    fitfun = @(K,t) [ evaluateReplicator(t,K,X0,library,selection_type); sqrt(options.shrinkage)*norm(K - K0) ];
+    
     % Fit the model
-    K = nlinfit(X_data',Yfit,fitfun,ones(length(F),1));
+    K = nlinfit( t_data, Yfit, fitfun, ones(N_funs,1));
     
 end
 
@@ -68,43 +73,102 @@ end
 
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+    
+function X = evaluateReplicator(t,K,X0,library,selection_type)
+
+%%% PARAMETER DEFINITIONS
+
+% Number of points to use for replicator trajectories
+N_simpts = 10001;
+% Initial tolerance to trial replicator solves
+init_tol = 1e-5;
+% Minimum tolerance for replicator solves before abandoning
+min_tol = 1e-11;
+% Tolerance decrease factor (scales tolerance upon integration failure)
+tol_factor = 0.01;
+% Flag for solving using either a standard or DAE formulation
+solve_as_DAE = true;
+ 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Subfunction that evaluates the right hand side of the type II selection
-% replicator for all observations:
-%       dx/dt =  x o ( f / [f^T x] - 1 )
-function y_model = modelfun(X,F,k)
+% Prepare a mass matrix to confine results to probability simplex
+N_feat = length(X0);
+M = eye(N_feat);
+M(N_feat,N_feat) = 0;
+running = true;
+success = false;
 
-% Evaluate the right hand side as described
-obs_RHS = X' .* ( normalised_f(X',F,k) - ones(size(X')) );
-% Append data for all model species into a list for fitting purposes
-y_model = obs_RHS(:);
+% Disable warnings as we will try many tolerances
+warning('off','MATLAB:ode15s:IntegrationTolNotMet');
+        
+% Prepare timepoints for simulation
+timepoints = linspace(0, max(t), N_simpts);
 
-end
+% Initialise tolerance
+tol = init_tol;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Generate the fitness function for the input functions and coefficients
+%fitness = @(X) evaluateLibrary(X, F, K);
+library = setfield(library,'coeffs',K);
+[A,Q] = libraryToPayoff(library,N_feat);
+fitness = matricesToFitness(A,Q);
 
-% Subfunction that evaluates the normalised fitness values obtained given
-% some current fitness function (defined by library F and coefficients k)
-% and current state x. Providing a matrix X allows vectorised calculation
-% across many states
-function f = normalised_f(X,F,k)
-
-% Initialise the fitness vector and normalising constant
-fitvec = 0;
-const = 0;
-
-% Loop over each library function
-for j = 1:length(F)
+% Solve the replicator ODE
+while running
     
-    % Library terms contribute directly to fitness
-    fitvec = fitvec + k(j) * F{j}(X);
-    % Constant is the sum of all f^T x terms
-    const = const + k(j) * sum(X .* F{j}(X));
+    % Attempt a DAE solve if the flag to do so is set
+    DAE_failed = false;
+    if solve_as_DAE
+        
+        % Attempt solve at current tolerance
+        try
+            odeoptions = odeset('Mass',M,'AbsTol',tol,'RelTol',tol);
+            odesol = ode15s( @(t,X) replicatorRHS(X,fitness,selection_type,true), timepoints, X0, odeoptions );
+        catch
+            DAE_failed = true;
+        end
+        
+        % If simulation did not make it to final time, mark failure
+        if ~DAE_failed && abs(odesol.x(end) - max(t)) > 1e-10
+            DAE_failed = true;
+        end
+        
+    end
     
-end
+    % If DAE solve failed, or not trying, solve using standard ODE
+    if ~solve_as_DAE || DAE_failed
+        odeoptions = odeset('AbsTol',tol,'RelTol',tol);
+        odesol = ode15s( @(t,X) replicatorRHS(X,fitness,selection_type,false), timepoints, X0, odeoptions);
+    end
+    
+    % Terminate if integration successful
+    if abs(odesol.x(end) - max(t)) <= 1e-10
+        running = false;
+        success = true;
+    end
+    
+    % Terminate without success if tolerance too small
+    if tol <= min_tol && ~success
+        running = false;
+        fprintf('\n WARNING: There was a failure to solve the ODE even with strictest tolerance! Output will be truncated.\n');
+    end
+    
+    % Otherwise, decrease tolerance and try again
+    tol = tol * tol_factor;
+    
+end  
 
-% Calculate final fitness term f / [f^T x] for output
-f = fitvec ./ const;
+% Re-enable warnings to not bother the user's session
+warning('on','MATLAB:ode15s:IntegrationTolNotMet');
+
+% If solved successfully, return results
+if success
+    X = deval(odesol,t);
+    X = X(:);
+% Otherwise, return junk data to tell nonlinear solver this is a bad spot
+else
+    X = 1e10 * zeros(length(X0)*length(t),1);
+end
 
 end

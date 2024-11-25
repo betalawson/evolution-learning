@@ -1,4 +1,4 @@
-function simResults = runSims( problem, ELoptions, param_fun, pop_sizes, N_rep )
+function simResults = runSims( problem, ELoptions, param_fun, pop_sizes, N_rep, sim_gen )
 %
 % This function generates multiple (N_rep) copies of data from the
 % Wright-Fisher model for the provided problem object 'problem', for each
@@ -26,8 +26,10 @@ N_pops = length(pop_sizes);
 
 % Initialise storage - separate for both approaches (standard and
 % gradient-matching) due to use of parfor
-l2LS_mat = zeros(N_pops, 2, N_rep);
-l2EL_mat = zeros(N_pops, 2, N_rep);
+obsl2LS_mat = zeros(N_pops, 2, N_rep);
+obsl2EL_mat = zeros(N_pops, 2, N_rep);
+predl2LS_mat = zeros(N_pops, 2, N_rep);
+predl2EL_mat = zeros(N_pops, 2, N_rep);
 paramsLS_mat = cell(N_pops, 2, N_rep);
 paramsEL_mat = cell(N_pops, 2, N_rep);
 fLS_mat = cell(N_pops, 2, N_rep);
@@ -41,7 +43,7 @@ for k = 1:N_pops
     
     % Loop over the two types of selection and generate results for each
     for type = 1:2
-        
+                
         % Prepare problem object using input problem but with current
         % selection type and population size
         Pobj = setfield(problem, 'selection_type', type);
@@ -52,55 +54,41 @@ for k = 1:N_pops
         EL_toc = zeros(1,N_rep);
         
         % Repeatedly generate Wright-Fisher data, measure fit, get params
-        parfor r = 1:N_rep
+        parfor r = 1:N_rep     
             
             % Generate the Wright-Fisher and replicator data
             traj = generateTrajectories(Pobj);
             
             % Convert to non-dimensionalised time for equation learning
-            WF_nonD = struct('t',traj.WF.t / Pobj.t_gen, 'X', traj.WF.X);
+            WF_nonDs = struct('t',traj.WF.t / Pobj.t_gen, 'X', traj.WF.X);
             
             % Perform least-squares equation learning
             tic;
-            [Flib, K, Ftexts] = LSevolutionLearning(WF_nonD, type, ELoptions);
+            library = evolutionLearning(WF_nonDs, type, setfield(ELoptions,'regression_type','ls'));
             LS_toc(r) = toc;
             
             % Store fitness function and params for the learned dynamics
-            F_here = @(X) libraryRHS(X, Flib, K);
+            F_here = @(X) evaluateLibrary(X, library);
             fLS_mat{k,type,r} = F_here;
-            paramsLS_mat{k,type,r} = param_fun(K, Ftexts, type);
+            paramsLS_mat{k,type,r} = param_fun(library, type);
             
-            % Compare learned fitness to the data
-            learned_traj = generateTrajectories( setfield(Pobj,'fitness', @(X) libraryRHS(X, Flib, K)), 'rep' );
-            if isequal(size(traj.rep.X(:)),size(learned_traj.rep.X(:))) 
-                l2LS_mat(k,type,r) = rms( traj.rep.X(:) - learned_traj.rep.X(:) );
-            % If integration still managed to fail despite adaptive
-            % tolerance specification, store a NaN (and the corresponding
-            % entry in f_mat can be checked manually later)
-            else
-                l2LS_mat(k,type,r) = NaN;
-            end
+            % Calculate L2 error between learned and true replicator
+            obsl2LS_mat(k,type,r) = calculateTrajectoryError(Pobj, F_here, Pobj.X0);
+            predl2LS_mat(k,type,r) = calculateTrajectoryError(setfield(Pobj,'N_gen',sim_gen), F_here, Pobj.X0);
             
             % Now use our gradient matching method
             tic;
-            [~, Flib, K, Ftexts] = evolutionLearning(WF_nonD, type, ELoptions);
+            library = evolutionLearning(WF_nonDs, type, setfield(ELoptions,'regression_type','gm'));
             EL_toc(r) = toc;
             
             % Store fitness function and params for the learned dynamics
-            F_here = @(X) libraryRHS(X, Flib, K);
+            F_here = @(X) evaluateLibrary(X, library);
             fEL_mat{k,type,r} = F_here;
-            paramsEL_mat{k,type,r} = param_fun(K, Ftexts, type);
+            paramsEL_mat{k,type,r} = param_fun(library, type);
             
-            % Compare learned fitness to the data
-            learned_traj = generateTrajectories( setfield(Pobj,'fitness', @(X) libraryRHS(X, Flib, K)), 'rep' );
-            if isequal(size(traj.rep.X(:)),size(learned_traj.rep.X(:)))
-                l2EL_mat(k,type,r) = rms( traj.rep.X(:) - learned_traj.rep.X(:) );    
-            % If integration still managed to fail despite adaptive
-            % tolerance specification, store a NaN (and the corresponding
-            % entry in f_mat can be checked manually later)
-            else
-                l2EL_mat(k,type,r) = NaN;
-            end
+            % Calculate L2 error between learned and true replicator
+            obsl2EL_mat(k,type,r) = calculateTrajectoryError(Pobj, F_here, Pobj.X0);
+            predl2EL_mat(k,type,r) = calculateTrajectoryError(setfield(Pobj,'N_gen',sim_gen), F_here, Pobj.X0);
             
         end
         
@@ -112,8 +100,10 @@ for k = 1:N_pops
 end
 
 % Gather together the data for least-squares and gradient matching
-l2_mat(:,1:2,:) = l2LS_mat;
-l2_mat(:,3:4,:) = l2EL_mat;
+obsl2_mat(:,1:2,:) = obsl2LS_mat;
+obsl2_mat(:,3:4,:) = obsl2EL_mat;
+predl2_mat(:,1:2,:) = predl2LS_mat;
+predl2_mat(:,3:4,:) = predl2EL_mat;
 f_mat(:,1:2,:) = fLS_mat;
 f_mat(:,3:4,:) = fEL_mat;
 params_mat(:,1:2,:) = paramsLS_mat;
@@ -124,7 +114,8 @@ params_mat(:,3:4,:) = paramsEL_mat;
 
 % Initialise storage - separate for both approaches (standard and
 % gradient-matching) due to use of parfor
-l2_perfect = zeros(1, 4);
+obsl2_perfect = zeros(1, 4);
+predl2_perfect = zeros(1, 4);
 params_perfect = cell(1, 4);
 
 % Loop over the two types of selection and generate results for each
@@ -143,29 +134,64 @@ for type = 1:2
     end
             
     % Calculate the best-fit parameters 
-    [Flib, K, Ftexts] = LSevolutionLearning(struct('t',traj.rep.t/problem.t_gen,'X',traj.rep.X), type, ELoptions);
+    library = evolutionLearning(struct('t',traj.rep.t/problem.t_gen,'X',traj.rep.X), type, setfield(ELoptions,'regression_type','ls'));
     
-    % Extract parameters
-    params_perfect{type} = param_fun(K, Ftexts, type);
+    % Extract parameters and fitness function
+    params_perfect{type} = param_fun(library, type);
+    F_here = @(X) evaluateLibrary(X, library);
     
     % Find root mean square error for these dynamics
-    learned_traj = generateTrajectories( setfield(Pobj,'fitness', @(X) libraryRHS(X, Flib, K)), 'rep' );
-    l2_perfect(type) = rms( traj.rep.X(:) - learned_traj.rep.X(:) );
-    
+    obsl2_perfect(type) = calculateTrajectoryError(Pobj, F_here, Pobj.X0);
+    predl2_perfect(type) = calculateTrajectoryError(setfield(Pobj,'N_gen',sim_gen), F_here, Pobj.X0);
+        
     % Now use our gradient matching method, with the derivative estimates already provided
     traj.rep.Xdash = Xdash_true;
-    [~, Flib, K, Ftexts] = evolutionLearning(traj.rep, type, ELoptions);
+    library = evolutionLearning(traj.rep, type, setfield(ELoptions,'regression_type','grad'));
     
-    % Extract parameters
-    params_perfect{type+2} = param_fun(K, Ftexts, type);
+    % Extract parameters and fitness function
+    params_perfect{type+2} = param_fun(library, type);
+    F_here = @(X) evaluateLibrary(X, library);
     
     % Find root mean square error for these dynamics
-    learned_traj = generateTrajectories( setfield(Pobj,'fitness', @(X) libraryRHS(X, Flib, K)), 'rep' );
-    l2_perfect(type+2) = rms( traj.rep.X(:) - learned_traj.rep.X(:) );
+    obsl2_perfect(type+2) = calculateTrajectoryError(Pobj, F_here, Pobj.X0);
+    predl2_perfect(type+2) = calculateTrajectoryError(setfield(Pobj,'N_gen',sim_gen), F_here, Pobj.X0);
     
 end
 
 % Store all the results in a struct
-simResults = struct('l2_mat',l2_mat,'l2_perfect',l2_perfect,'params_mat',{params_mat},'params_perfect',{params_perfect},'f_mat',{f_mat},'pop_sizes',pop_sizes,'timing',timing);
+simResults = struct('obsl2_mat',obsl2_mat,'obsl2_perfect',obsl2_perfect,'predl2_mat',predl2_mat,'predl2_perfect',predl2_perfect,'params_mat',{params_mat},'params_perfect',{params_perfect},'f_mat',{f_mat},'pop_sizes',pop_sizes,'timing',timing);
+
+end
+
+function l2 = calculateTrajectoryError(Pobj, F, X0list)
+% This function generates replicator trajectories for the provided problem
+% object, and for the provided object but with the specified fitness
+% function F, and evaluates the average l2 error between them across all of
+% the initial conditions provided in X0list
+
+% Read out the number of ICs given (number of column vectors in X0list)
+N_ICs = size(X0list,2);
+
+% Loop over all trajectories and evaluate each's contribution to mean error
+l2 = 0;
+for k = 1:N_ICs
+               
+    % Create a problem object for this initial condition
+    Phere = setfield(Pobj, 'X0', X0list(:,k));
+    
+    % Create trajectory for true selective dynamics
+    true_traj = generateTrajectories( Phere, 'rep' );
+    % Create trajectory for learned dynamics
+    learned_traj = generateTrajectories( setfield(Phere, 'fitness', F), 'rep' );
+                
+    % Calculate error - if integration failed despite adaptive tolerance
+    % specification, store a NaN
+    if isequal(size(true_traj.rep.X(:)),size(learned_traj.rep.X(:))) 
+        l2 = l2 + rms( true_traj.rep.X(:) - learned_traj.rep.X(:) ) / N_ICs;
+    else
+        l2 = NaN;
+    end
+                
+end
 
 end

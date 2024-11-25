@@ -18,4 +18,4 @@ end
             
 % Extract the values of s and h 
 params.s = A(1,1) - 1;
-params.h = (A(1,2) - 1) / params.s;
+params.hs = A(1,2) - 1;

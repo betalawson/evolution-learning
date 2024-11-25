@@ -1,13 +1,27 @@
-function K = SINDy(X_data, X_dash_data, F, options)
+function K = evoSINDy(X_data, X_dash_data, F, options)
 % 
-% K = SINDy(X_data, X_dash_data, F, options)
+% K = evoSINDy(X_data, X_dash_data, F, options)
 %
-% This function takes a series of observations regarding how the state of a
-% system relates to its rate of change, as specified by inputs X_data and
-% X_dash_data, and attempts to determine the coefficients for a library of
-% functions, F, that specify this relationship (and hence specify the set
-% of ordinary differential equations that govern that system). The user can
-% also optionally specify that coefficients must be positive.
+% This function takes a series of observations regarding feature frequency,
+% except expressed in terms of how the current state of the system relates
+% to its rate of change, X vs X_dash, and determines coefficients for a
+% library of functions, F, that are though to in some combination specify
+% this relationship. Owing to learning of a fitness function rather than a
+% right hand side function, to access the SINDy framework we must also
+% transform the fitness functions F into their replicator-transformed
+% equivalents. That is, we learn
+%    X' = X . ( sum[k_i F_i(X)] - sum[k_i F_i(X)^T X] e ),
+% where 'e' is the vector of all ones and each element F_i(X) is one of the
+% functions in the full provided set of functions 'F'. 
+% 
+% The replicator transform converts this into the typical SINDy learning 
+% problem:
+%    X' = sum[ k_i G_i(X) ].
+% 
+% The user can optionally supply options regarding whether to force 
+% positivity of learned coefficients, and the level of shrinkage to the 
+% null model that is applied. If these options are not supplied, default 
+% options are used.
 %
 % -Inputs-
 %
@@ -28,12 +42,6 @@ function K = SINDy(X_data, X_dash_data, F, options)
 %        options: Used here to specify whether to enforce positivity of
 %                 constants, and also to provide the level of shrinkage
 %
-% Optional arguments:
-%
-%     interactions - a matrix of true/false values, indicating which
-%     species are allowed to interact with which other species in
-%     constructing the list of reactions
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -47,7 +55,10 @@ N_funs = length(F);
 if nargin < 4
     options = [];
 end
-options = imbueELDefaults(options);
+options = addDefaultOptions(options);
+
+% Transform the set of input functions into type I replicator functions
+F = convertToReplicatorLibrary(F);
 
 
 %%% CONSTRUCTION OF SINDy MATRIX SYSTEM

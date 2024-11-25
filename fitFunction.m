@@ -1,7 +1,7 @@
-function f = fitFunction(x_data, y_data, options)
+function [F, Fdash] = fitFunction(x_data, y_data, options)
 %
-%    f = fitFunction(x, y)
-%    f = fitFunction(x, y, options)
+%    [F, Fdash] = fitFunction(x, y)
+%    [F, Fdash] = fitFunction(x, y, options)
 %
 % This function takes as input a set of points (x,y), each specified by
 % vectors, and attempts to fit a function to that data using the requested
@@ -21,20 +21,24 @@ function f = fitFunction(x_data, y_data, options)
 %
 % -Outputs-
 %
-%         f: A function of form F(X) that outputs a predicted y value for 
+%         F: A function of form F(X) that outputs a predicted y value for 
 %            an input x value
-%
+%     Fdash: A function of form F(X) that outputs an estimate of the
+%            derivative, calculated using F
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%% USER SPECIFIED PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%
+options.N_pts = 1000;                % Number of points used in function plotting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Convert all data to columns
 x_data = x_data(:);
 y_data = y_data(:);
 
-% Read in default options if they weren't provided
+% Only visualise if specifically requested to
 if nargin < 3
-    options = imbueELDefaults([],1);
-else
-    options = imbueELDefaults(options,1);
+    options = imbueELdefaults([],1);
 end
 
 % Fit the function according to the requested method
@@ -43,29 +47,50 @@ switch lower(options.deriv_method)
     case {'gp','gpr'}
         
         % Fit a Gaussian process to the data using MATLAB's built-in
-        GP = fitrgp(x_data,y_data);
+        GP = fitrgp(x_data,y_data,'BasisFunction','Constant');
         % Create a function that evaluates the fitted GP for F(x)
-        f = @(x) reshape(predict(GP,x(:)),size(x));
-        
+        F = @(x) reshape(predict(GP,x(:)),size(x));
+        % Create a function that evaluates F'(x) via finite differencing
+        Fdash = @(x) (F(x + sqrt(eps)) - F(x - sqrt(eps))) / (2*sqrt(eps));
+
     case {'gp-careful'}
         
         % Fit a Gaussian process to the data using MATLAB's built-in
         GP = fitrgp(x_data,y_data,'OptimizeHyperparameters','auto','HyperparameterOptimizationOptions',struct('Verbose',0,'ShowPlots',false));
         % Create a function that evaluates the fitted GP for F(x)
-        f = @(x) reshape(predict(GP,x(:)),size(x));
+        F = @(x) reshape(predict(GP,x(:)),size(x));
+        % Create a function that evaluates F'(x) via finite differencing
+        Fdash = @(x) (F(x + sqrt(eps)) - F(x - sqrt(eps))) / (2*sqrt(eps));
    
     case {'local-polynomial','poly','local'}
                 
         % Use the subfunction defined below to evaluate the derivative
-        f = @(x) localPolynomialFit(x, x_data, y_data, options.kernel_bandwidth, options.polynomial_order, options.polyfit_regularisation, 0);
+        F = @(x) localPolynomialFit(x, x_data, y_data, options.kernel_bandwidth, options.polynomial_order, options.polyfit_regularisation, 0);
+        Fdash = @(x) localPolynomialFit(x, x_data, y_data, options.kernel_bandwidth, options.polynomial_order, options.polyfit_regularisation, 1);
         
 end
+
+% Plot the predictions if requested
+if options.visualise_fit
+       
+    % Prepare figure
+    figure('units','normalized','OuterPosition',[0 0 1 1]);
+    hold on;
+    % Calculate and plot functional fit
+    xpts = linspace(min(x_data), max(x_data),options.N_pts)';
+    Ffit = F(xpts);
+    plot(xpts, Ffit, 'r', 'LineWidth', 2.5);
+    % Plot data over the top
+    plot(x_data, y_data, 'k.', 'MarkerSize', 30);
+    
+end
+
+
 
 
 function out = localPolynomialFit(x, x_data, y_data, h, p, lambda, est_deriv)
 % This subfunction solves the least squares problem associated with "local
-% polynomial regression", and returns an estimate of the derivative of
-% order equal to the input variable "est_deriv".
+% polynomial regression"
 
 % If provided with a null bandwidth, attempt to automatically set it using
 % point separation
@@ -82,8 +107,7 @@ for n1 = 1:N1
         % Grab out the current evaluation point
         x0 = x(n1,n2);
         % Generate weights for each datapoint based on tricube kernel
-        %w = 70/81 * (1 - (abs((x_data - x0)/h)).^3 ).^3 / h;
-        w = 1/h * exp( -(x_data - x0).^2 / (2*h^2) );
+        w = 70/81 * (1 - (abs((x_data - x0)/h)).^3 ).^3 / h;
         % Grab out only those points with w > 0
         valid = (w > 0);
         N_valid = sum(valid);
@@ -98,7 +122,7 @@ for n1 = 1:N1
         for k = 1:p
             X(:,k+1) = (x_data(valid) - x0).^k;
         end
-                
+        
         % Solve the least squares problem to get the estimator
         beta = ( X' * W * X + lambda * eye(p+1) ) \ ( X' * W * y_data(valid) );
         % The function estimate is the sum up to requested order of terms
