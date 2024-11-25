@@ -37,7 +37,7 @@ ELoptions.polyfit_regularisation = 1e-7;    % Local polynomial regression: ridge
 
 % Parameters used for determination of library coefficients
 ELoptions.force_positive = true;            % Force coefficients to be positive
-ELoptions.shrinkage = 1e-6;                 % Extent of shrinkage to apply (L2 penalisation on non-zero library term coefficients). Set to 0 to apply no shrinkage. 
+ELoptions.shrinkage = 1e-3;                 % Extent of shrinkage to apply (L2 penalisation on non-zero library term coefficients). Set to 0 to apply no shrinkage. 
 ELoptions.nlin_silent = false;              % If 'true', calls to nlinfit inside coefficient determination routines will supress common warnings
 
 % Default names
