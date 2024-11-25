@@ -1,4 +1,4 @@
-function FIGURES1_realDataExample()
+function FIGURE9a_realDataExample()
 % This function simply creates a visual demonstration of the equation
 % learning process and its performance
 

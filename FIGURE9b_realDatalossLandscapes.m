@@ -1,4 +1,4 @@
-function FIGURE2b_realDatalossLandscapes(regenerate)
+function FIGURE9b_realDatalossLandscapes(regenerate)
 % This function plots the loss surface to be optimised in fitting the
 % parameters of a basic bi-allelic inheritance problem to synthetic data.
 % This is compared with the corresponding loss surface for gradient
