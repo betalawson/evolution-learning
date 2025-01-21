@@ -1,11 +1,10 @@
-function FIGURE5_triAlleleExamples
+function FIGURES6_RPSManyExamples
 %
 % This function visualises example trajectories, and the corresponding
-% fitted fitness libraries, for the three different tri-allelic selection
-% problems that we consider. Plots are generated at a low population level,
-% to show the effects of drift/stochasticity, and at a high population
-% level, to highlight learning of the "true" trajectory
-
+% fitted fitness libraries, for the three different rock-paper-scissors 
+% scenarios that we use as test problems. Plots are generated at a low
+% population level, to show the effects of drift/stochasticity, and also at
+% a high population level, to highlight learning of the "true" trajectory
 
 
 %%% PROBLEM SPECIFICATIONS
@@ -13,30 +12,30 @@ function FIGURE5_triAlleleExamples
 % Observation frequency
 obs_Nth = 1;
 % Number of generations to actually observe
-obs_gen = 20;
+obs_gen = 100;
 % Number of generations to simulate trajectories over
-sim_gen = 50;
+sim_gen = 200;
 % Number of separate datasets to use in learning
 N_data = 1;
 % Number of replicates to plot on each triangle
-N_reps = 1;
+N_reps = 10;
 % Population size
-N_pops = [1000, 100000];
+N_pops = [1000];
 % Selection type
-selection_type = 2;
+selection_type = 1;
 
 %%% EVOLUTION LEARNING SPECIFICATIONS
 
-ELoptions.library_orders = 1;
-ELoptions.symmetric_payoff = true;
+ELoptions.library_orders = 0:1;
+ELoptions.symmetric_payoff = false;
 ELoptions.nlin_silent = true;
 
 %%% INITIALISATION
 
 % Load in the set of tri-allelic selection problems, store them in array
-load('problems_inheritance.mat','allele_persistence','allele_standard','allele_transient');
-problems_list = {allele_standard, allele_transient, allele_persistence};
-problem_names = {'Standard', 'Transient', 'Persistence'};
+load('problems_RPS.mat','RPS_balanced', 'RPS_attract', 'RPS_repel');
+problems_list = {RPS_balanced, RPS_attract, RPS_repel};
+problem_names = {'Balanced', 'Attracting', 'Repelling'};
 
 
 %%% FIGURE CREATION
@@ -105,47 +104,30 @@ for n = 1:length(N_pops)
             
             % Clear legend for each go through loop
             legend_txt = cell(0);
-            
-            % Plot the data
-            for k = 1:N_data
-                
-                % Plot using the simplex plotter for three variables
-                trianglePlot(trajWFs{k}.t, trajWFs{k}.X', '.', 'MarkerSize', 35, 'MarkerEdgeColor', [0 0 0]);
-                
-                % If this is first plot, add extra empty legend entires for the
-                % triangle, and the data, otherwise just one empty for next data
-                if k == 1
-                    legend_txt(end+1:end+6) = {''};
-                    legend_txt{end+1} = 'Data      $\hphantom{f}$';
-                else
-                    legend_txt{end+1} = '';
-                end
-                
-            end
-            
+                       
             % Plot the true replicator
             trianglePlot(traj_true.rep.t, traj_true.rep.X', 'LineWidth', 5, 'color', [0.4 0.4 0.4]);
+            % Extra legend entries for the triangle
+            legend_txt(end+1:end+6) = {''};
             % Add a legend entry for it
             legend_txt{end+1} = 'True Selective Pressure      $\hphantom{f}$';
             
             % Plot the least squares replicator - observation and forecast period
             trianglePlot(traj_ls.rep.t(traj_ls.rep.t <= problem.t_gen * obs_gen), traj_ls.rep.X(:,traj_ls.rep.t <= problem.t_gen * obs_gen)', 'LineWidth', 5, 'color', [1 0.4 0.4]);
-            trianglePlot(traj_ls.rep.t(traj_ls.rep.t > problem.t_gen * obs_gen), traj_ls.rep.X(:,traj_ls.rep.t > problem.t_gen * obs_gen)', ':', 'LineWidth', 5, 'color', [1 0.4 0.4]);
+            %trianglePlot(traj_ls.rep.t(traj_ls.rep.t > problem.t_gen * obs_gen), traj_ls.rep.X(:,traj_ls.rep.t > problem.t_gen * obs_gen)', ':', 'LineWidth', 5, 'color', [1 0.4 0.4]);
             % Legend entry for curve and blank for forecast
             legend_txt{end+1} = 'Least Squares      $\hphantom{f}$';
-            legend_txt{end+1} = '';
+            %legend_txt{end+1} = '';
             
             % Plot the gradient matching replicator - observation and forecast period
             trianglePlot(traj_grad.rep.t(traj_grad.rep.t <= problem.t_gen * obs_gen), traj_grad.rep.X(:,traj_grad.rep.t <= problem.t_gen * obs_gen)', 'LineWidth', 5, 'color', [0.4 0.4 1]);
-            trianglePlot(traj_grad.rep.t(traj_grad.rep.t > problem.t_gen * obs_gen), traj_grad.rep.X(:,traj_grad.rep.t > problem.t_gen * obs_gen)', ':', 'LineWidth', 5, 'color', [0.4 0.4 1]);
+            %trianglePlot(traj_grad.rep.t(traj_grad.rep.t > problem.t_gen * obs_gen), traj_grad.rep.X(:,traj_grad.rep.t > problem.t_gen * obs_gen)', ':', 'LineWidth', 5, 'color', [0.4 0.4 1]);
             % Legend entry for curve and blank for forecast
             legend_txt{end+1} = 'Gradient Matching      $\hphantom{f}$';
-            legend_txt{end+1} = '';
+            %legend_txt{end+1} = '';
             
-            % Re-plot the data to ensure it appears on top
-            for k = 1:N_data
-                trianglePlot(trajWFs{k}.t, trajWFs{k}.X', '.', 'MarkerSize', 35, 'MarkerEdgeColor', [0 0 0]);
-            end
+            % Re-plot the selective trajectory to ensure it appears on top
+            trianglePlot(traj_true.rep.t, traj_true.rep.X', 'LineWidth', 5, 'color', [0.4 0.4 0.4]);
             
             % Add a title to the current plot if this is the top row
             if n == 1

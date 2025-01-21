@@ -40,7 +40,7 @@ for type = show_types
         LS_problem.fitness = F_LS{k};
         
         % Generate and plot this trajectory
-        traj = generateTrajectories(LS_problem,'rep');
+        traj = simulateTrajectories(LS_problem,'rep');
         plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 2, 'Color', plot_clrs(1,:));
         
         % Create flipped least squares problem 
@@ -48,7 +48,7 @@ for type = show_types
         LS_problem.fitness = F_LS{k};
         
         % Generate and plot this trajectory
-        traj = generateTrajectories(LS_problem,'rep');
+        traj = simulateTrajectories(LS_problem,'rep');
         plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 2, 'Color', plot_clrs(2,:));
         
         % Create evolution learning problem 
@@ -56,7 +56,7 @@ for type = show_types
         EL_problem.fitness = F_EL{k};
         
         % Generate and plot this trajectory
-        traj = generateTrajectories(EL_problem,'rep');
+        traj = simulateTrajectories(EL_problem,'rep');
         plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 2, 'Color', plot_clrs(3,:));
         
         % Create flipped evolution learning problem 
@@ -64,15 +64,15 @@ for type = show_types
         EL_problem.fitness = F_EL{k};
         
         % Generate and plot this trajectory
-        traj = generateTrajectories(EL_problem,'rep');
+        traj = simulateTrajectories(EL_problem,'rep');
         plot(traj.rep.t, traj.rep.X(1,:), 'LineWidth', 2, 'Color', plot_clrs(4,:));
         
     end
     
     % Generate and plot the true trajectories
-    traj = generateTrajectories(problem,'rep');
+    traj = simulateTrajectories(problem,'rep');
     plot(traj.rep.t, traj.rep.X(1,:), 'k', 'LineWidth', 3);
-    traj = generateTrajectories(ICproblem,'rep');
+    traj = simulateTrajectories(ICproblem,'rep');
     plot(traj.rep.t, traj.rep.X(1,:), 'k', 'LineWidth', 3);
 
 end

@@ -1,4 +1,4 @@
-function FIGURE5_triAlleleExamples
+function FIGURES4_triAlleleExamples_long
 %
 % This function visualises example trajectories, and the corresponding
 % fitted fitness libraries, for the three different tri-allelic selection
@@ -15,7 +15,7 @@ obs_Nth = 1;
 % Number of generations to actually observe
 obs_gen = 20;
 % Number of generations to simulate trajectories over
-sim_gen = 50;
+sim_gen = 20000;
 % Number of separate datasets to use in learning
 N_data = 1;
 % Number of replicates to plot on each triangle

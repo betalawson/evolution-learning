@@ -26,7 +26,7 @@ selection_type = 2;
 
 %%% EVOLUTION LEARNING SPECIFICATIONS
 
-ELoptions.library_orders = 1;
+ELoptions.library_orders = 0:1;
 ELoptions.symmetric_payoff = false;
 ELoptions.nlin_silent = true;
 
@@ -74,7 +74,7 @@ for n = 1:length(N_pops)
             % non-dimensionalised form for learning
             problem.N_gen = obs_gen;
             for k = 1:N_data
-                trajWF = generateTrajectories(problem,'WF');
+                trajWF = simulateTrajectories(problem,'WF');
                 trajWFs{k} = struct('t',trajWF.WF.t,'X',trajWF.WF.X);
                 trajWFs_nonD{k} = struct('t',trajWF.WF.t / problem.t_gen, 'X', trajWF.WF.X);
             end
@@ -88,13 +88,13 @@ for n = 1:length(N_pops)
             % Apply evolution learning to this data, using both types of regression
             library_grad = evolutionLearning(trajWFs_nonD, problem.selection_type, setfield(ELoptions, 'regression_type','grad'));
             library_ls = evolutionLearning(trajWFs_nonD, problem.selection_type, setfield(ELoptions, 'regression_type','ls'));
-            
+                        
             % Simulate the replicator for the learned fitness functions
-            traj_grad = generateTrajectories(setfield(problem, 'fitness', @(X) evaluateLibrary(X,library_grad)), 'rep' );
-            traj_ls = generateTrajectories(setfield(problem, 'fitness', @(X) evaluateLibrary(X,library_ls)), 'rep' );
+            traj_grad = simulateTrajectories(setfield(problem, 'fitness', @(X) evaluateLibrary(X,library_grad)), 'rep' );
+            traj_ls = simulateTrajectories(setfield(problem, 'fitness', @(X) evaluateLibrary(X,library_ls)), 'rep' );
             
             % Also simulate the true selective pressure for this problem
-            traj_true = generateTrajectories(problem, 'rep');
+            traj_true = simulateTrajectories(problem, 'rep');
             
             
             %%% PLOT ALL CURVES TOGETHER
@@ -140,7 +140,7 @@ for n = 1:length(N_pops)
             % Legend entry for curve and blank for forecast
             legend_txt{end+1} = 'Gradient Matching      $\hphantom{f}$';
             legend_txt{end+1} = '';
-            
+                        
             % Re-plot the data to ensure it appears on top
             for k = 1:N_data
                 trianglePlot(trajWFs{k}.t, trajWFs{k}.X', '.', 'MarkerSize', 35, 'MarkerEdgeColor', [0 0 0]);

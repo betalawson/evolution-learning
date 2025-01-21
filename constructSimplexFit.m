@@ -10,9 +10,9 @@ options.N_pts = 1000;                % Number of points used in function plottin
 
 % Read in default options if they weren't provided
 if nargin < 2
-    options = imbueELDefaults([],1);
+    options = addDefaultOptions([],1);
 else
-    options = imbueELDefaults(options,1);
+    options = addDefaultOptions(options,1);
 end
 
 % Use the first point in the provided data to read out number of features

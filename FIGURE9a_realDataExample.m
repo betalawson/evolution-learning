@@ -36,7 +36,7 @@ grad_s = params.s;
 grad_h = params.hs / params.s;
 
 % Simulate the trajectory for the learned fitness
-learned_traj = generateTrajectories( setfield(problem,'fitness',@(X) evaluateLibrary(X,library)), 'rep');
+learned_traj = simulateTrajectories( setfield(problem,'fitness',@(X) evaluateLibrary(X,library)), 'rep');
 
 % Also do a separate learning of the actual data directly
 library = evolutionLearning(data, problem.selection_type, setfield(ELoptions, 'regression_type', 'ls'));
@@ -48,7 +48,7 @@ ls_s = params.s;
 ls_h = params.hs / params.s;
 
 % Simulate the trajectory for the learned fitness
-nlin_traj = generateTrajectories( setfield(problem,'fitness',@(X) evaluateLibrary(X,library)), 'rep');
+nlin_traj = simulateTrajectories( setfield(problem,'fitness',@(X) evaluateLibrary(X,library)), 'rep');
 
 
 %%% PLOTTING

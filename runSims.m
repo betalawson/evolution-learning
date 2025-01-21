@@ -57,7 +57,7 @@ for k = 1:N_pops
         parfor r = 1:N_rep     
             
             % Generate the Wright-Fisher and replicator data
-            traj = generateTrajectories(Pobj);
+            traj = simulateTrajectories(Pobj);
             
             % Convert to non-dimensionalised time for equation learning
             WF_nonDs = struct('t',traj.WF.t / Pobj.t_gen, 'X', traj.WF.X);
@@ -126,7 +126,7 @@ for type = 1:2
     Pobj = setfield(problem, 'selection_type', type);
            
     % Generate the replicator data including perfectly correct derivatives
-    traj = generateTrajectories(Pobj,'rep');
+    traj = simulateTrajectories(Pobj,'rep');
     X_true = traj.rep.X;
     Xdash_true = zeros(size(X_true));
     for j = 1:size(X_true,2)
@@ -180,9 +180,9 @@ for k = 1:N_ICs
     Phere = setfield(Pobj, 'X0', X0list(:,k));
     
     % Create trajectory for true selective dynamics
-    true_traj = generateTrajectories( Phere, 'rep' );
+    true_traj = simulateTrajectories( Phere, 'rep' );
     % Create trajectory for learned dynamics
-    learned_traj = generateTrajectories( setfield(Phere, 'fitness', F), 'rep' );
+    learned_traj = simulateTrajectories( setfield(Phere, 'fitness', F), 'rep' );
                 
     % Calculate error - if integration failed despite adaptive tolerance
     % specification, store a NaN

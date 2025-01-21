@@ -12,8 +12,8 @@ function plotRMSEBoxplot(simResults, x_txts, xlabel_txt, title_txt, fig_filename
 % Specify the colours to use in plotting the two selection types and two
 % regression methods
 plot_clrs = [   [ 0.6, 0.0, 0.0 ];          % Dark red
-                [ 1.0, 0.4, 0.4 ];          % Light red
                 [ 0.0, 0.0, 0.6 ];          % Dark blue
+                [ 1.0, 0.4, 0.4 ];          % Light red
                 [ 0.4, 0.4, 1.0 ]  ];       % Light blue
             
 % Specify how these should be labelled in (optional) legend
